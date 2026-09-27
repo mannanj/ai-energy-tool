@@ -1,0 +1,9 @@
+{
+  "name": "aet-rt-experiment",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "TreeRoom", "class_name": "TreeRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TreeRoom"] }],
+  "observability": { "enabled": true }
+}
