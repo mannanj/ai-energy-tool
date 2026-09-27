@@ -137,7 +137,7 @@ export function TreeCanvas() {
     for (const c of changes) {
       const k = spreadRef.current;
       if ("id" in c && c.id.startsWith("b:")) {
-        if (c.type === "position" && c.position && !c.dragging) { const sq = squareOf(c.id.slice(2)); if (sq) moveBubble(c.id.slice(2), c.position.x - sq.x * k, c.position.y - sq.y); }
+        if (c.type === "position" && c.position) { const sq = squareOf(c.id.slice(2)); if (sq) moveBubble(c.id.slice(2), c.position.x - sq.x * k, c.position.y - sq.y); }
         continue;
       }
       if (c.type === "position" && c.position && !c.dragging) moveNode(c.id, c.position.x / k, c.position.y);
