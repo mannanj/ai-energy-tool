@@ -1,0 +1,6 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.DS_Store
+context/sources/_capture-tooling/node_modules/

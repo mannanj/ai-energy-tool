@@ -1,0 +1,123 @@
+[
+  {
+    "filename": "dss-pipp.pdf",
+    "url": "https://www.dss.virginia.gov/relief/pipp/",
+    "status": "OK"
+  },
+  {
+    "filename": "dss-energy-assistance.pdf",
+    "url": "https://www.dss.virginia.gov/relief/ea/",
+    "status": "OK"
+  },
+  {
+    "filename": "commonhelp-home.png",
+    "url": "https://commonhelp.virginia.gov/",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "dominion-energyshare.pdf",
+    "url": "https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/energyshare",
+    "status": "OK"
+  },
+  {
+    "filename": "dominion-energy-assistance.pdf",
+    "url": "https://www.dominionenergy.com/virginia/paying-my-bill/energy-assistance",
+    "status": "OK"
+  },
+  {
+    "filename": "dominion-pipp.pdf",
+    "url": "https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/percentage-of-income-payment-program",
+    "status": "OK"
+  },
+  {
+    "filename": "dominion-budget-billing.pdf",
+    "url": "https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/budget-billing",
+    "status": "OK"
+  },
+  {
+    "filename": "dominion-medical-conditions.pdf",
+    "url": "https://www.dominionenergy.com/virginia/start-stop-service/medical-conditions",
+    "status": "OK"
+  },
+  {
+    "filename": "dominion-scams.pdf",
+    "url": "https://www.dominionenergy.com/virginia/protect-yourself-from-scams",
+    "status": "OK"
+  },
+  {
+    "filename": "fairfax-energy-assistance.png",
+    "url": "https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/energy-assistance",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "fairfax-csp.png",
+    "url": "https://www.fairfaxcounty.gov/neighborhood-community-services/coordinated-services-planning",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "fairfax-dfs-offices.png",
+    "url": "https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/human-services-centers",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "hhs-poverty-guidelines-2026.pdf",
+    "url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines",
+    "status": "OK"
+  },
+  {
+    "filename": "scc-dominion-biennial-review-2025.pdf",
+    "url": "https://www.scc.virginia.gov/about-the-scc/newsreleases/release/scc-issues-order-on-dev-biennial-review-2025/scc-rules-in-dev-biennial-review-case.html",
+    "status": "OK"
+  },
+  {
+    "filename": "scc-electric-service-map.pdf",
+    "url": "https://www.scc.virginia.gov/consumers/public-utility/electricity-faqs/regulated-companies-service-map/",
+    "status": "OK"
+  },
+  {
+    "filename": "novec-about.pdf",
+    "url": "https://www.novec.com/About_NOVEC/",
+    "status": "OK"
+  },
+  {
+    "filename": "koinonia-emergency-assistance.pdf",
+    "url": "http://www.koinoniacares.org/emergency-assistance.html",
+    "status": "OK"
+  },
+  {
+    "filename": "211-koinonia.png",
+    "url": "https://search.211virginia.org/search/2d0109d3-0a5f-53e1-b7f5-994d1ceff4db",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "211-salvation-army-fairfax.png",
+    "url": "https://search.211virginia.org/search/690f8d35-137a-54e8-a292-adce5939537a",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "united-community-locations.png",
+    "url": "https://www.unitedcommunity.org/locations/",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "united-community-energyshare-vanavigator.png",
+    "url": "https://virginianavigator.org/program/39664/heating-and-cooling-assistance-energyshare-program",
+    "status": "BLOCKED"
+  },
+  {
+    "filename": "catholic-charities-utilities.pdf",
+    "url": "https://ccda.net/find-help/emergency-assistance/utilities/",
+    "status": "OK"
+  },
+  {
+    "filename": "chp-weatherization.pdf",
+    "url": "https://www.communityhousingpartners.org/energy-solutions/weatherization/",
+    "status": "FAILED",
+    "note": "goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.communityhousingpartners.org/energy-solutions/weatherization/\", waiting until \"networkidle\"\u001b[22m\n"
+  },
+  {
+    "filename": "211virginia-home.png",
+    "url": "https://www.211virginia.org/",
+    "status": "BLOCKED"
+  }
+]

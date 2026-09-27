@@ -1,0 +1,82 @@
+=== dss-pipp.pdf <- https://www.dss.virginia.gov/relief/pipp/ ===
+  OK -> dss-pipp.pdf
+=== dss-energy-assistance.pdf <- https://www.dss.virginia.gov/relief/ea/ ===
+  OK -> dss-energy-assistance.pdf
+=== commonhelp-home.pdf <- https://commonhelp.virginia.gov/ ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> commonhelp-home.png
+=== dominion-energyshare.pdf <- https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/energyshare ===
+  first attempt failed (goto: net::ERR_HTTP2_PROTOCOL_ERROR at https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/energyshare
+Call log:
+[2m  - navigating to "https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/energyshare", waiting until "networkidle"[22m
+), retrying with realistic UA...
+  OK -> dominion-energyshare.pdf
+=== dominion-energy-assistance.pdf <- https://www.dominionenergy.com/virginia/paying-my-bill/energy-assistance ===
+  OK -> dominion-energy-assistance.pdf
+=== dominion-pipp.pdf <- https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/percentage-of-income-payment-program ===
+  OK -> dominion-pipp.pdf
+=== dominion-budget-billing.pdf <- https://www.dominionenergy.com/virginia/paying-my-bill/billing-options/budget-billing ===
+  OK -> dominion-budget-billing.pdf
+=== dominion-medical-conditions.pdf <- https://www.dominionenergy.com/virginia/start-stop-service/medical-conditions ===
+  OK -> dominion-medical-conditions.pdf
+=== dominion-scams.pdf <- https://www.dominionenergy.com/virginia/protect-yourself-from-scams ===
+  OK -> dominion-scams.pdf
+=== fairfax-energy-assistance.pdf <- https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/energy-assistance ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> fairfax-energy-assistance.png
+=== fairfax-csp.pdf <- https://www.fairfaxcounty.gov/neighborhood-community-services/coordinated-services-planning ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> fairfax-csp.png
+=== fairfax-dfs-offices.pdf <- https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/human-services-centers ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> fairfax-dfs-offices.png
+=== hhs-poverty-guidelines-2026.pdf <- https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines ===
+  OK -> hhs-poverty-guidelines-2026.pdf
+=== scc-dominion-biennial-review-2025.pdf <- https://www.scc.virginia.gov/about-the-scc/newsreleases/release/scc-issues-order-on-dev-biennial-review-2025/scc-rules-in-dev-biennial-review-case.html ===
+  OK -> scc-dominion-biennial-review-2025.pdf
+=== scc-electric-service-map.pdf <- https://www.scc.virginia.gov/consumers/public-utility/electricity-faqs/regulated-companies-service-map/ ===
+  OK -> scc-electric-service-map.pdf
+=== novec-about.pdf <- https://www.novec.com/About_NOVEC/ ===
+  OK -> novec-about.pdf
+=== koinonia-emergency-assistance.pdf <- http://www.koinoniacares.org/emergency-assistance.html ===
+  OK -> koinonia-emergency-assistance.pdf
+=== 211-koinonia.pdf <- https://search.211virginia.org/search/2d0109d3-0a5f-53e1-b7f5-994d1ceff4db ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> 211-koinonia.png
+=== 211-salvation-army-fairfax.pdf <- https://search.211virginia.org/search/690f8d35-137a-54e8-a292-adce5939537a ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> 211-salvation-army-fairfax.png
+=== united-community-locations.pdf <- https://www.unitedcommunity.org/locations/ ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> united-community-locations.png
+=== united-community-energyshare-vanavigator.pdf <- https://virginianavigator.org/program/39664/heating-and-cooling-assistance-energyshare-program ===
+  first attempt failed (goto: Timeout 45000ms exceeded.
+Call log:
+[2m  - navigating to "https://virginianavigator.org/program/39664/heating-and-cooling-assistance-energyshare-program", waiting until "networkidle"[22m
+), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> united-community-energyshare-vanavigator.png
+=== catholic-charities-utilities.pdf <- https://ccda.net/find-help/emergency-assistance/utilities/ ===
+  OK -> catholic-charities-utilities.pdf
+=== chp-weatherization.pdf <- https://www.communityhousingpartners.org/energy-solutions/weatherization/ ===
+  first attempt failed (goto: Timeout 45000ms exceeded.
+Call log:
+[2m  - navigating to "https://www.communityhousingpartners.org/energy-solutions/weatherization/", waiting until "networkidle"[22m
+), retrying with realistic UA...
+  FAILED: goto: Timeout 45000ms exceeded.
+Call log:
+[2m  - navigating to "https://www.communityhousingpartners.org/energy-solutions/weatherization/", waiting until "networkidle"[22m
+
+=== 211virginia-home.pdf <- https://www.211virginia.org/ ===
+  first attempt failed (blocked), retrying with realistic UA...
+  BLOCKED, taking screenshot...
+  SCREENSHOT -> 211virginia-home.png
+
+DONE

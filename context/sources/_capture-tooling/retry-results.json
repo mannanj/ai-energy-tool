@@ -1,0 +1,53 @@
+[
+  {
+    "filename": "commonhelp-home.pdf",
+    "url": "https://commonhelp.virginia.gov/",
+    "status": "OK"
+  },
+  {
+    "filename": "fairfax-energy-assistance.pdf",
+    "url": "https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/energy-assistance",
+    "status": "OK"
+  },
+  {
+    "filename": "fairfax-csp.pdf",
+    "url": "https://www.fairfaxcounty.gov/neighborhood-community-services/coordinated-services-planning",
+    "status": "OK"
+  },
+  {
+    "filename": "fairfax-dfs-offices.pdf",
+    "url": "https://www.fairfaxcounty.gov/familyservices/office-locations",
+    "status": "OK"
+  },
+  {
+    "filename": "211-koinonia.pdf",
+    "url": "https://search.211virginia.org/search/2d0109d3-0a5f-53e1-b7f5-994d1ceff4db",
+    "status": "OK"
+  },
+  {
+    "filename": "211-salvation-army-fairfax.pdf",
+    "url": "https://search.211virginia.org/search/690f8d35-137a-54e8-a292-adce5939537a",
+    "status": "OK"
+  },
+  {
+    "filename": "united-community-locations.pdf",
+    "url": "https://www.unitedcommunity.org/locations/",
+    "status": "OK"
+  },
+  {
+    "filename": "211virginia-home.pdf",
+    "url": "https://www.211virginia.org/",
+    "status": "OK"
+  },
+  {
+    "filename": "chp-weatherization.pdf",
+    "url": "https://www.communityhousingpartners.org/energy-solutions/weatherization/",
+    "status": "FAILED",
+    "note": "goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.communityhousingpartners.org/energy-solutions/weatherization/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  },
+  {
+    "filename": "united-community-energyshare-vanavigator.pdf",
+    "url": "https://virginianavigator.org/program/39664/heating-and-cooling-assistance-energyshare-program",
+    "status": "OK"
+  }
+]

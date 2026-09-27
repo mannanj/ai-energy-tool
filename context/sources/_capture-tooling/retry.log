@@ -1,0 +1,25 @@
+=== commonhelp-home.pdf <- https://commonhelp.virginia.gov/ (networkidle) ===
+  OK -> commonhelp-home.pdf
+=== fairfax-energy-assistance.pdf <- https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/energy-assistance (networkidle) ===
+  OK -> fairfax-energy-assistance.pdf
+=== fairfax-csp.pdf <- https://www.fairfaxcounty.gov/neighborhood-community-services/coordinated-services-planning (networkidle) ===
+  OK -> fairfax-csp.pdf
+=== fairfax-dfs-offices.pdf <- https://www.fairfaxcounty.gov/familyservices/office-locations (networkidle) ===
+  OK -> fairfax-dfs-offices.pdf
+=== 211-koinonia.pdf <- https://search.211virginia.org/search/2d0109d3-0a5f-53e1-b7f5-994d1ceff4db (networkidle) ===
+  OK -> 211-koinonia.pdf
+=== 211-salvation-army-fairfax.pdf <- https://search.211virginia.org/search/690f8d35-137a-54e8-a292-adce5939537a (networkidle) ===
+  OK -> 211-salvation-army-fairfax.pdf
+=== united-community-locations.pdf <- https://www.unitedcommunity.org/locations/ (networkidle) ===
+  OK -> united-community-locations.pdf
+=== 211virginia-home.pdf <- https://www.211virginia.org/ (domcontentloaded) ===
+  OK -> 211virginia-home.pdf
+=== chp-weatherization.pdf <- https://www.communityhousingpartners.org/energy-solutions/weatherization/ (domcontentloaded) ===
+  FAILED: goto: Timeout 45000ms exceeded.
+Call log:
+[2m  - navigating to "https://www.communityhousingpartners.org/energy-solutions/weatherization/", waiting until "domcontentloaded"[22m
+
+=== united-community-energyshare-vanavigator.pdf <- https://virginianavigator.org/program/39664/heating-and-cooling-assistance-energyshare-program (domcontentloaded) ===
+  OK -> united-community-energyshare-vanavigator.pdf
+
+DONE
