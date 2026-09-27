@@ -1,10 +1,3 @@
-/**
- * Generates sample conversations to test and demo the tree.
- *
- * A second model plays a Fairfax resident with a fixed backstory (scenarios below). The helper
- * answers with the real system prompt. Each chat is saved to SQLite, marked shared, and its link
- * printed. Run:  bun scripts/simulate.ts [--only name] [--turns 10] [--list]
- */
 import { getChat, getMessages, shareChat, transcript } from "../lib/db";
 import { complete, type ChatMessage } from "../lib/llm";
 import { runTurn, READER } from "../lib/turn";
@@ -18,7 +11,6 @@ const OPENING = "The rates for electricity have increased making it hard to make
 
 export interface Scenario { name: string; opener: string; persona: string; turns?: number; }
 
-/** Each scenario targets a branch or edge of context/decision-tree-assistance.md. */
 export const SCENARIOS: Scenario[] = [
   { name: "pipp-electric-heat", opener: OPENING,
     persona: "You live in Kingstowne (22310) with your husband and two kids (4 people). Dominion Energy sends the bill. Combined take-home is about $3,600 a month before taxes. You heat with an electric heat pump. You are about $350 behind, no disconnection notice yet. Nobody is over 60, under 5, disabled or a veteran. You rent an apartment. You have never heard of PIPP." },
@@ -74,7 +66,6 @@ const residentSystem = (s: Scenario) => `You are role-playing a real Fairfax Cou
 Backstory (stay consistent with it; reveal details only when the helper asks or when it is natural): ${s.persona}
 Rules: write like a real person texting, 1 to 3 short sentences, sometimes with typos. Answer the helper's question directly. Never volunteer everything at once. Do not repeat your opening. Never break character or mention being an AI. Answer the helper's questions so it can finish walking you through your options. If something is unclear you may ask one short follow-up. If the helper says it cannot help with what you asked, or has given you a clear next step, reply with a brief thanks and nothing more.`;
 
-/** Let the simulated resident carry an existing chat to its end. `persona` is the backstory; `seed` messages are the prior transcript. */
 export async function continueChat(chatId: string, persona: string, maxTurns = 8, log = console.log, tag = chatId): Promise<{ chatId: string; turns: number }> {
   const resident: ChatMessage[] = [{ role: "system", content: residentSystem({ name: tag, opener: "", persona }) }];
   for (const m of getMessages(chatId)) resident.push({ role: m.role === "user" ? "assistant" : "user", content: m.content });
@@ -102,7 +93,6 @@ export async function runScenario(s: Scenario, maxTurns = 8, log = console.log) 
   return t.chatId;
 }
 
-/** Rerun a chat from one of its helper replies: replay the resident's earlier messages through the current tree, then let the resident continue. */
 export async function rerunFrom(parentId: string, fromSeq: number, log = console.log): Promise<string> {
   const parent = getChat(parentId); if (!parent) throw new Error("no such chat");
   const msgs = getMessages(parentId);
@@ -133,7 +123,6 @@ if (import.meta.main) {
   const outDir = resolve(import.meta.dir, "../data/samples");
   mkdirSync(outDir, { recursive: true });
   const links: string[] = [];
-  // run 4 at a time; the key has a small limit
   for (let i = 0; i < todo.length; i += 4) {
     await Promise.all(todo.slice(i, i + 4).map(async (s) => {
       try {

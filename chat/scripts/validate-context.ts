@@ -1,10 +1,3 @@
-/**
- * Proves the chat agent got the tree as its context: for every helper reply in the unarchived chats, the square
- * it says it came from must exist in the LIVE tree (the Worker's export), that square's text must equal the
- * FACTS the writer was given (stored as `verbatim`), the tree stamp on the chat must match, and every number and
- * link in what the resident saw must trace to that square or to the earlier conversation.
- * Run: bun scripts/validate-context.ts
- */
 import { db, getMessages, listChats } from "../lib/db";
 import { fetchWorkerTree, workerEnabled, HOLE_REPLY, DECLINE_REPLY } from "../lib/tree";
 import { codeCheck } from "../lib/writer";
@@ -22,7 +15,6 @@ for (const c of listChats({ sharedOnly: false })) {
   for (const m of msgs) {
     if (m.role === "user") { convo += "\n" + m.content; continue; }
     const ids = m.node_id ? m.node_id.split(",") : [];
-    // the root is the resident's own question: it is on the path but never spoken
     const facts = ids.filter((id) => id !== live.tree.rootNodeId).map((id) => sq.get(id)?.text.trim() ?? `<missing ${id}>`).join("\n\n");
     if (ids.length) {
       checks++; for (const id of ids) if (!sq.has(id)) fail(`${c.scenario} #${m.seq}: square ${id} not in live tree`);

@@ -1,6 +1,3 @@
-"""Check saved chats: every phone number and link the helper said must exist in the tree the chat ran on
-(data/tree.json, else data/tree.seed.json) or in the sourced markdown; no source tags leak.
-Also prints how many replies were DeepSeek-written vs square-verbatim, and why verbatim was used."""
 import re, sqlite3, sys, os, json, collections
 here = os.path.dirname(os.path.abspath(__file__))
 tp = os.path.join(here, "../data/tree.json")

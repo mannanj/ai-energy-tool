@@ -1,14 +1,3 @@
-/**
- * The editor's tree document (app/src/types/tree.ts), used exactly as the backend.
- * Squares and arrows are the only data. Meaning is derived, never stored, the same way the editor does it:
- *   - a square with arrows out is a step: the helper says its text, then waits for the resident
- *   - a square with no arrows out is an answer: the helper says its text and the chat ends
- *   - an arrow label is an option the resident's reply is matched against ("Yes", "No", "Dominion")
- *   - arrows labeled "Either" (any case) or with no label ride along with whichever option is picked;
- *     an unlabeled arrow whose siblings are labeled is the fallback when nothing matches
- *   - a square with empty text is a HOLE: the helper gives the 2-1-1 fallback instead
- * Source: data/tree.json (export of the live editor) or data/tree.seed.json (the seed) if absent.
- */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHmac } from "node:crypto";
@@ -22,9 +11,6 @@ export const SEED_PATH = resolve(import.meta.dir, "../data/tree.seed.json");
 export const HOLE_REPLY = "I don't have a checked answer for this part yet. Call 2-1-1 (24/7) or visit 211virginia.org and a person there can find the right local help.";
 export const DECLINE_REPLY = "I can only help with one thing: electric bills for Dominion Energy customers in Fairfax County. For anything else, call 2-1-1 (24/7) or visit 211virginia.org.";
 
-/* ---------- the editor's Worker as the source (local: wrangler dev on WORKER_ORIGIN) ---------- */
-
-/** SESSION_SECRET from the environment, else from app/.dev.vars so local dev needs no copying. */
 function sessionSecret(): string | null {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
   try {
@@ -44,7 +30,6 @@ function serviceCookie(): string {
 }
 
 let workerCache: { doc: TreeDocument; at: number } | null = null;
-/** The live tree from the Worker's export route, cached for two seconds. Throws if the Worker is down. */
 export async function fetchWorkerTree(treeId = process.env.TREE_ID ?? "main"): Promise<TreeDocument> {
   if (workerCache && Date.now() - workerCache.at < 2000) return workerCache.doc;
   const res = await fetch(`${workerOrigin()}/api/tree/${treeId}/export`, { headers: { cookie: serviceCookie() } });
@@ -54,7 +39,6 @@ export async function fetchWorkerTree(treeId = process.env.TREE_ID ?? "main"): P
   return doc;
 }
 
-/** Where an imported tree is written: the TREE_JSON override if set, else the live file. */
 export const activePath = () => (process.env.TREE_JSON ? resolve(process.env.TREE_JSON) : LIVE_PATH);
 
 export function loadTree(): { doc: TreeDocument; source: "live" | "seed"; path: string } {
@@ -65,7 +49,6 @@ export function loadTree(): { doc: TreeDocument; source: "live" | "seed"; path: 
 export const isHole = (n: TreeNode) => !n.text.trim();
 export const isEither = (e: TreeEdge) => !!e.label && /^(either|any|all|always)$/i.test(e.label.trim());
 
-/** Problems that make a document unusable (throw) or suspicious (warn). */
 export function validate(doc: unknown): { errors: string[]; warnings: string[] } {
   const errors: string[] = [], warnings: string[] = [];
   const d = doc as Partial<TreeDocument>;
@@ -92,7 +75,6 @@ export class Tree {
   node(id: string) { return this.nodes.get(id); }
   children(id: string) { return this.out.get(id) ?? []; }
   isLeaf(id: string) { return this.children(id).length === 0; }
-  /** Distinct option labels on a node's arrows, excluding ride-along ("Either") and unlabeled arrows. */
   options(id: string): { label: string; targets: TreeNode[] }[] {
     const byLabel = new Map<string, TreeNode[]>();
     for (const e of this.children(id)) {
@@ -103,20 +85,18 @@ export class Tree {
     }
     return [...byLabel].map(([label, targets]) => ({ label, targets }));
   }
-  /** Targets for a picked label (or null for "nothing matched"): the label's arrows plus ride-alongs; fallback arrows only when nothing matched. */
   select(id: string, label: string | null): TreeNode[] {
     const edges = this.children(id);
     const hasLabels = edges.some((e) => e.label?.trim() && !isEither(e));
     const chosen = edges.filter((e) => {
       const l = e.label?.trim() ?? "";
-      if (!hasLabels) return true;                                  // plain continuation(s)
+      if (!hasLabels) return true;
       if (isEither(e)) return true;
-      if (!l) return label == null;                                 // unlabeled = fallback
+      if (!l) return label == null;
       return label != null && l.toLowerCase() === label.toLowerCase();
     });
     return chosen.map((e) => this.node(e.target)!).filter(Boolean);
   }
-  /** Reachability + holes, for the admin view and the coverage report. */
   report() {
     const seen = new Set<string>(); const stack = [this.root.id];
     while (stack.length) { const id = stack.pop()!; if (seen.has(id)) continue; seen.add(id); for (const e of this.children(id)) stack.push(e.target); }

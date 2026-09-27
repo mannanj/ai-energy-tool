@@ -3,7 +3,6 @@ import fs from 'fs';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
-// filename, url, waitStrategy
 const items = [
   ['commonhelp-home.pdf', 'https://commonhelp.virginia.gov/', 'networkidle'],
   ['fairfax-energy-assistance.pdf', 'https://www.fairfaxcounty.gov/familyservices/public-assistance-employment-services/energy-assistance', 'networkidle'],
@@ -33,7 +32,6 @@ async function run() {
       results.push({ filename, url, status: 'OK' });
     } catch (err) {
       process.stdout.write(`  FAILED: ${err.message}\n`);
-      // fallback screenshot
       const pngName = filename.replace(/\.pdf$/, '.png');
       try {
         await page.screenshot({ path: pngName, fullPage: true });

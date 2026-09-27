@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Tree, validate, isHole, type TreeDocument } from "../lib/tree";
 
-/** root -> q (Yes: a, b; No: c; Either: d; unlabeled: fallback) ; c -> leaf hole ; orphan unreachable */
 export function fixture(): TreeDocument {
   const n = (id: string, text: string, isRoot = false) => ({ id, text, x: 0, y: 0, width: 240, height: 120, isRoot });
   const e = (id: string, source: string, target: string, label?: string) => ({ id, source, target, label });
@@ -35,7 +34,7 @@ describe("Tree", () => {
     expect(r.holes).toEqual(["hole"]);
     expect(r.unreachable).toEqual(["orphan"]);
     expect(r.leaves.sort()).toEqual(["a", "b", "d", "fb", "hole", "orphan"]);
-    expect(T.children("c").map((e) => e.id)).toEqual(["e6"]);      // e7 dangling, e8 self-loop dropped
+    expect(T.children("c").map((e) => e.id)).toEqual(["e6"]);
     expect(isHole(T.node("hole")!)).toBe(true);
     expect(T.isLeaf("c")).toBe(false);
   });

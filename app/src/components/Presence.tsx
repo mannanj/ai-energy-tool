@@ -4,7 +4,6 @@ import { api, fullName } from "@/lib/api";
 
 const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
-/** Who is here right now, plus sign out. */
 export function Presence() {
   const me = useTreeStore((s) => s.me);
   const peers = useTreeStore((s) => s.peers);

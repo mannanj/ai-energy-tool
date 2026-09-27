@@ -1,8 +1,3 @@
-/**
- * End-to-end against a live server with real Jev + DeepSeek: boots server.ts on a scratch port and DB,
- * imports a small tree with a hole and a No arrow, runs chats over HTTP, checks the chat-plugin API and
- * rerun. (The canvas UI lives in the editor app, app/, and is checked there.) Run: bun scripts/e2e.ts
- */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -36,18 +31,15 @@ try {
   const t = await fetch(BASE + "/api/tree").then((r) => r.json());
   check("tree loaded with one hole", t.report.holes.join() === "gas" && t.nodes.length === 6);
 
-  // 1. off-topic opener
   let r = await chat(null, "My water bill is crazy high, can you help?");
   check("water bill: declined and done", r.status === "done" && /can only help/.test(r.reply), r.reply.slice(0, 60));
 
-  // 2. urgent path
   r = await chat(null, "The rates for electricity have increased making it hard to make ends meet, what can I do?");
   check("opener: step0 asked, open", r.status === "open" && r.nodeIds.includes("step0"));
   const urgentChat = r.chatId;
   r = await chat(urgentChat, "yes, I got a disconnection notice yesterday");
   check("Yes -> urgent leaf, done, numbers kept", r.status === "done" && r.nodeIds.includes("urgent") && r.reply.includes("866-366-4357") && r.reply.includes("2-1-1"), r.reply.slice(0, 80));
 
-  // 3. No -> heat -> Electric answer (written or verbatim, numbers must survive)
   r = await chat(null, "Electric got expensive and I can't make ends meet");
   const mainChat = r.chatId;
   r = await chat(mainChat, "no notice, power is on, no medical stuff");
@@ -57,21 +49,18 @@ try {
   r = await chat(mainChat, "anything else?");
   check("ended chat stays ended", r.status === "done" && /has ended/.test(r.reply));
 
-  // 4. hole
   r = await chat(null, "help with my electric bill please");
   const holeChat = r.chatId;
   await chat(holeChat, "no, none of those");
   r = await chat(holeChat, "gas furnace");
   check("Gas -> hole -> 2-1-1 line, done", r.status === "done" && r.nodeIds.includes("gas") && /2-1-1/.test(r.reply) && /don't have a checked answer/.test(r.reply), r.reply.slice(0, 80));
 
-  // 5. inspector API: node ids, verbatim, review present
   const adm = await fetch(BASE + "/api/admin/chats").then((x) => x.json());
   const mc = adm.chats.find((c: any) => c.id === mainChat);
   const last = mc.messages.filter((m: any) => m.role === "assistant").slice(-2)[0];
   check("admin api: squares + verbatim + review on replies", last.node_ids.includes("elec") && typeof last.verbatim === "string" && last.review && ["written", "verbatim"].includes(last.review.used), `used=${last.review?.used} ${last.review?.reason ?? ""}`);
   check("admin api: visits counted", adm.visits.step0 >= 3 && adm.holes.join() === "gas");
 
-  // 6. import: bad doc rejected, edited doc accepted and used by the next chat
   let imp = await post("/api/tree/import", { nodes: [], edges: [] });
   check("import rejects garbage", imp.s === 400);
   const edited = JSON.parse(JSON.stringify(TREE)); edited.nodes[5].text = "With gas heat, PIPP sets your payment at 6% of income. Apply at commonhelp.virginia.gov.";
@@ -79,7 +68,6 @@ try {
   imp = await post("/api/tree/import", edited);
   check("import accepts edited tree, no holes now", imp.s === 200 && imp.j.report.holes.length === 0);
 
-  // 7. rerun the hole chat from its last reply: same path, the edited square now answers
   const rr = await post(`/api/chats/${holeChat}/rerun`, { seq: 6 });
   check("rerun creates a linked chat", rr.s === 200 && !!rr.j.id, rr.j.error ?? "");
   const adm2 = await fetch(BASE + "/api/admin/chats").then((x) => x.json());

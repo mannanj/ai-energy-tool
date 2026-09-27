@@ -1,11 +1,3 @@
-/**
- * Worker entry: static Next export + auth API + Durable Object rooms.
- *
- *  /gate, /signin      public pages (signin needs the gate cookie)
- *  /api/*              auth endpoints
- *  /parties/tree-room/:id   WebSocket (needs session cookie)
- *  everything else     needs gate + session, then served from assets
- */
 import { getServerByName, routePartykitRequest } from "partyserver";
 import type { Env } from "./env";
 import { clearCookie, consumeLoginToken, createLoginToken, gateCookie, getSession, hasGate, passwordMatches, sessionCookie, upsertUser, SESSION_COOKIE, GATE_COOKIE } from "./auth";
@@ -63,7 +55,6 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
     if (!user) return new Response(expiredPage(), { status: 400, headers: { "Content-Type": "text/html;charset=utf-8" } });
     const headers = new Headers({ Location: "/" });
     headers.append("Set-Cookie", await sessionCookie(env, { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, color: user.color }, secure));
-    // clicking the link in a browser that never entered the password still counts: the link proves the email
     headers.append("Set-Cookie", await gateCookie(env, secure));
     return new Response(null, { status: 302, headers });
   }
@@ -75,14 +66,12 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   }
 
   if (path === "/api/lock" && req.method === "POST") {
-    // forget the password in this browser too (used by "sign out everywhere")
     const headers = new Headers();
     headers.append("Set-Cookie", clearCookie(SESSION_COOKIE));
     headers.append("Set-Cookie", clearCookie(GATE_COOKIE));
     return json({ ok: true }, { headers });
   }
 
-  // /api/tree/:id/(export|versions|versions/:n|versions/:n/restore) → the room's HTTP handler
   const m = /^\/api\/tree\/([\w-]+)\/(export|versions(?:\/\d+(?:\/restore)?)?)$/.exec(path);
   if (m) {
     const s = await getSession(req, env);
@@ -111,7 +100,6 @@ export default {
       return (await routePartykitRequest(req, env as unknown as Record<string, unknown>)) ?? new Response("not found", { status: 404 });
     }
 
-    // static assets: gate the pages, not the chunks
     const isPage = req.method === "GET" && !path.startsWith("/_next/") && !/\.[a-z0-9]+$/i.test(path);
     if (isPage) {
       const gate = await hasGate(req, env);

@@ -20,7 +20,6 @@ import { NODE_H, NODE_W } from "@/lib/seed";
 const nodeTypes = { square: SquareNode, bubble: BubbleNode };
 const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge };
 const BUBBLE_GAP = 14, BUBBLE_COL = 314, BUBBLE_STACK = 30;
-/** In chat mode the tree is spread horizontally so one bubble column per shown chat fits between squares. View x = doc x × spread. */
 const spreadFor = (cols: number) => (cols ? 1 + (Math.min(cols, 4) * BUBBLE_COL) / 300 : 1);
 
 export function TreeCanvas() {
@@ -49,9 +48,6 @@ export function TreeCanvas() {
   const spread = inspectOn ? spreadFor(shown.length) : 1;
   const spreadRef = useRef(spread); spreadRef.current = spread;
 
-  /** Every message of each shown chat as a bubble: helper replies beside the square they came from, the resident's
-   *  message just above its reply, edges resident → helper → next resident. Dragged positions are offsets from the
-   *  helper's square, shared through the tree document, so bubbles follow their square. */
   const bubbles = useMemo(() => {
     const nodesOut: BubbleNodeType[] = []; const edgesOut: Edge[] = [];
     if (!inspectOn) return { nodesOut, edgesOut };
@@ -82,7 +78,6 @@ export function TreeCanvas() {
     });
     return { nodesOut, edgesOut };
   }, [inspectOn, chats, shown, doc.nodes, bubblePos, spread]);
-  /** The square a bubble is anchored to: the helper reply's square, or for a resident message the square of the reply after it. */
   const squareOf = useCallback((bubbleKey: string) => {
     const [cid, seqS] = bubbleKey.split(":"); const seq = Number(seqS);
     const msgs = chats.find((c) => c.id === cid)?.messages ?? [];
@@ -127,17 +122,15 @@ export function TreeCanvas() {
   );
   const allEdges = useMemo(() => [...edges, ...bubbles.edgesOut], [edges, bubbles]);
 
-  // Node moves and removals are applied to the store; React Flow itself stays controlled.
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     for (const c of changes) {
       const k = spreadRef.current;
-      if ("id" in c && c.id.startsWith("b:")) {                       // chat bubble: only its shared offset from its square changes
+      if ("id" in c && c.id.startsWith("b:")) {
         if (c.type === "position" && c.position && !c.dragging) { const sq = squareOf(c.id.slice(2)); if (sq) moveBubble(c.id.slice(2), c.position.x - sq.x * k, c.position.y - sq.y); }
         continue;
       }
       if (c.type === "position" && c.position && !c.dragging) moveNode(c.id, c.position.x / k, c.position.y);
       else if (c.type === "position" && c.position && c.dragging) {
-        // live drag: update store so the panel/pop-out follow; cheap enough for a tree this size
         moveNode(c.id, c.position.x / k, c.position.y);
       } else if (c.type === "dimensions" && c.dimensions && c.resizing) resizeNode(c.id, c.dimensions.width, c.dimensions.height);
       else if (c.type === "remove") deleteNode(c.id);
@@ -151,7 +144,7 @@ export function TreeCanvas() {
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     for (const c of changes) {
-      if ("id" in c && c.id.startsWith("t:")) continue;   // chat threads are derived, never edited
+      if ("id" in c && c.id.startsWith("t:")) continue;
       if (c.type === "remove") deleteEdge(c.id);
       else if (c.type === "select") {
         const st = useTreeStore.getState();
@@ -163,13 +156,12 @@ export function TreeCanvas() {
 
   const onConnect = useCallback((c: Connection) => { if (c.source && c.target) addEdge(c.source, c.target); }, [addEdge]);
 
-  // Keyboard shortcuts (ignored while typing in a field)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       const typing = t.tagName === "TEXTAREA" || t.tagName === "INPUT";
       if (typing && e.key === "Escape") { t.blur(); return; }
-      if (typing && e.key === "Tab") return; // let textarea/panel handle tab
+      if (typing && e.key === "Tab") return;
       if (typing) return;
       if (e.metaKey || e.ctrlKey) return;
       const st = useTreeStore.getState();

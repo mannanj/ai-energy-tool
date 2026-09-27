@@ -13,7 +13,6 @@ const Avatar = ({ role }: { role: "user" | "assistant" }) => role === "user" ? (
   </span>
 );
 
-/** The chat plugin's panel tab: run a scenario, list chats, read one with reruns. Chats come from the chat server. */
 export function ChatsView() {
   const { chats, scenarios, shown, current, busy, error, reachable, showArchived } = useChatStore();
   const { load, select, showAll, rerun, runScenario, setShowArchived, archive } = useChatStore.getState();

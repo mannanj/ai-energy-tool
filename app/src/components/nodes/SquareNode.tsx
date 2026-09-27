@@ -9,10 +9,6 @@ import { LinkPills } from "@/components/LinkPills";
 export type SquareData = { text: string; isRoot: boolean; number: string; autoFocus?: boolean; onPath?: boolean; hole?: boolean };
 export type SquareNodeType = Node<SquareData, "square">;
 
-/**
- * The only shape on the canvas. Click inside to type. Drag by the grip bar or the border ring.
- * Resize with the corner/edge handles (visible when selected). Links inside become pills at the bottom.
- */
 export const SquareNode = memo(function SquareNode({ id, data, selected, width, height }: NodeProps<SquareNodeType>) {
   const updateText = useTreeStore((s) => s.updateNodeText);
   const resizeNode = useTreeStore((s) => s.resizeNode);
@@ -24,7 +20,6 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
   const { lockedBy } = useLock(id);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  // if someone else takes the square while we are typing in it, drop focus so the gray state shows
   useEffect(() => {
     if (lockedBy && document.activeElement === ref.current) ref.current?.blur();
   }, [lockedBy]);
@@ -33,11 +28,9 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
     if (data.autoFocus) { ref.current?.focus(); clearFocus(); }
   }, [data.autoFocus, clearFocus]);
 
-  // Tab while typing in a square → new connected child below (and focus moves to it)
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
-      // leave this field first so fast keystrokes cannot land here while the child mounts
       (e.target as HTMLTextAreaElement).blur();
       addChild(id);
     }
@@ -69,7 +62,6 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
       <Handle type="target" position={Position.Top} className="!h-3 !w-3 !bg-neutral-400" />
       <Handle type="source" position={Position.Bottom} className="!h-3 !w-3 !bg-sky-500" />
 
-      {/* grip bar: drag here */}
       <div className="flex h-5 shrink-0 cursor-grab items-center justify-between rounded-t px-2 text-[10px] text-neutral-400 active:cursor-grabbing">
         <span>{data.isRoot ? "Top level question" : `#${data.number}`}</span>
         <span className="tracking-widest">⋮⋮⋮</span>

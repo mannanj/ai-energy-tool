@@ -1,7 +1,6 @@
 "use client";
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
 
-/** Line in the chat's colour from one bubble to the next of the same chat (resident → helper → next resident). Not selectable. */
 export function ThreadEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps) {
   const [path] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const color = (data as { color?: string } | undefined)?.color ?? "#1f5f3f";

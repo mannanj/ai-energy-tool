@@ -1,4 +1,3 @@
-/** Local SQLite store for chats. One file, two tables. Full message text is stored verbatim. */
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -38,10 +37,10 @@ db.run(`CREATE TABLE IF NOT EXISTS messages (
 )`);
 db.run("CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat_id, seq)");
 for (const col of ["status TEXT NOT NULL DEFAULT 'open'", "state TEXT NOT NULL DEFAULT '{}'"]) {
-  try { db.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch { /* already there */ }
+  try { db.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch { }
 }
-for (const col of ["node_id TEXT", "verbatim TEXT", "review TEXT", "drafts TEXT"]) { try { db.run(`ALTER TABLE messages ADD COLUMN ${col}`); } catch { /* already there */ } }
-for (const col of ["parent_id TEXT", "parent_seq INTEGER", "tree_updated_at TEXT", "archived INTEGER NOT NULL DEFAULT 0"]) { try { db.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch { /* already there */ } }
+for (const col of ["node_id TEXT", "verbatim TEXT", "review TEXT", "drafts TEXT"]) { try { db.run(`ALTER TABLE messages ADD COLUMN ${col}`); } catch { } }
+for (const col of ["parent_id TEXT", "parent_seq INTEGER", "tree_updated_at TEXT", "archived INTEGER NOT NULL DEFAULT 0"]) { try { db.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch { } }
 
 const now = () => new Date().toISOString();
 
@@ -94,7 +93,6 @@ export function listChats(opts: { sharedOnly?: boolean; limit?: number; includeA
      FROM chats c ${where} ORDER BY updated_at DESC LIMIT ?`).all(opts.limit ?? 200);
 }
 
-/** Archive every chat except the newest `keep`. Archived chats stay in the database and at their links, but leave the lists. */
 export function archiveAllBut(keep: number, opts: { except?: string[] } = {}): { archived: number; kept: string[] } {
   const keepIds = new Set([...db.query<{ id: string }, [number]>("SELECT id FROM chats WHERE archived = 0 ORDER BY created_at DESC LIMIT ?").all(keep).map((r) => r.id), ...(opts.except ?? [])]);
   const all = db.query<{ id: string }, []>("SELECT id FROM chats WHERE archived = 0").all();
@@ -109,7 +107,6 @@ export function deleteChat(id: string): void {
   db.query("DELETE FROM chats WHERE id = ?").run(id);
 }
 
-/** Plain-text transcript, the same thing the share page shows. */
 export function transcript(chat: Chat, messages: Message[]): string {
   const lines = [`# ${chat.title || "Chat"}`, `${chat.created_at}  model ${chat.model}${chat.scenario ? `  scenario ${chat.scenario}` : ""}`, ""];
   for (const m of messages) lines.push(`${m.role === "user" ? "Resident" : "Helper"}: ${m.content}`, "");

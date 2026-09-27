@@ -1,7 +1,3 @@
-/**
- * Experiment: one Durable Object room per tree, Yjs CRDT sync + awareness (cursors),
- * persisted to the DO's own SQLite storage. Runs inside the user's own Cloudflare account.
- */
 import { routePartykitRequest, Server } from "partyserver";
 import { withYjs } from "y-partyserver";
 import * as Y from "yjs";

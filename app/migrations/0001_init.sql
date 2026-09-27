@@ -1,4 +1,3 @@
--- Who may edit. Created on first magic-link sign-in.
 CREATE TABLE user (
   id         TEXT NOT NULL PRIMARY KEY,
   email      TEXT NOT NULL UNIQUE,
@@ -9,7 +8,6 @@ CREATE TABLE user (
   last_seen  TEXT
 );
 
--- A magic link. Stored hashed; single use; 20 minute life.
 CREATE TABLE login_token (
   token_hash TEXT NOT NULL PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE,

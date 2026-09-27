@@ -3,7 +3,6 @@ import { useTreeStore } from "@/lib/store";
 import { useSession } from "@/lib/useSession";
 import { TreePanel } from "@/components/panel/TreePanel";
 
-/** Pop-out window: the panel alone, full width, connected to the same room. */
 export default function PanelPage() {
   const { status } = useSession();
   const hydrated = useTreeStore((s) => s.hydrated);

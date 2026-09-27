@@ -3,7 +3,6 @@ import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { useChatStore, type Review } from "@/lib/chats";
 
-/** One message of a chat as a bubble on the canvas. Helper bubbles sit beside the square their reply came from. */
 export type BubbleData = { chatId: string; seq: number; role: "user" | "assistant"; color: string; text: string; nodeIds: string[]; review: Review | null; label: string | null };
 export type BubbleNodeType = Node<BubbleData, "bubble">;
 
@@ -18,7 +17,6 @@ const Robot = () => (
   </span>
 );
 
-/** Simple safe markdown: bold and line breaks. */
 export function Rich({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return <>{parts.map((p, i) => p.startsWith("**") && p.endsWith("**") ? <strong key={i}>{p.slice(2, -2)}</strong> : <span key={i} className="whitespace-pre-wrap">{p}</span>)}</>;

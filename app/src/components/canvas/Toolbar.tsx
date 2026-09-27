@@ -19,7 +19,6 @@ function Btn({ title, onClick, children, disabled }: { title: string; onClick: (
   );
 }
 
-/** Fixed single-column toolbar on the left. Screen-fixed: unaffected by zoom or pan. */
 export function Toolbar() {
   const rf = useReactFlow();
   const addNode = useTreeStore((s) => s.addNode);

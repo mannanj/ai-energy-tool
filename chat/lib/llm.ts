@@ -1,6 +1,3 @@
-/** Minimal OpenRouter chat-completions client. Reasoning is switched off: DeepSeek V4 Flash otherwise spends the
- *  token budget on hidden reasoning and can return an empty visible reply.
- * Streaming yields text deltas; complete() returns the full text. */
 export interface ChatMessage { role: "system" | "user" | "assistant"; content: string; }
 
 const API = "https://openrouter.ai/api/v1/chat/completions";
@@ -50,7 +47,7 @@ export async function* stream(model: string, messages: ChatMessage[], opts: { te
         const j = JSON.parse(payload);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) yield delta as string;
-      } catch { /* keep-alive comments and partial lines */ }
+      } catch { }
     }
   }
 }

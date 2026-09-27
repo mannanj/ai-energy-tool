@@ -1,8 +1,3 @@
-/**
- * One resident message in, one helper reply out, by walking the editor's tree.
- * Code owns where we are (state.nodeId) and the path taken; the reader only picks arrows.
- * Used by server.ts and scripts/simulate.ts alike.
- */
 import { addMessage, createChat, getChat, getMessages, getState, setState, type Chat } from "./db";
 import { read as defaultRead, readerName, translate, type Read, type Option } from "./judge";
 export type Reader = (text: string, said: string, options: Option[], first: boolean) => Promise<Read>;
@@ -13,7 +8,6 @@ const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 export const READER = readerName;
 
 let cached: { tree: Tree; source: string; path: string; mtime: number } | null = null;
-/** The tree in use: the file (re-read when it changes), or, after ensureTree(), the Worker's live document. */
 export function tree(): Tree {
   if (workerEnabled() && cached?.source === "worker") return cached.tree;
   const { doc, source, path } = loadTree();
@@ -21,7 +15,6 @@ export function tree(): Tree {
   if (!cached || cached.path !== path || cached.mtime !== mtime) cached = { tree: new Tree(doc), source, path, mtime };
   return cached.tree;
 }
-/** Refresh from the Worker when that is the source. Call before a turn. Falls back to the last good copy, then the file. */
 export async function ensureTree(): Promise<Tree> {
   if (workerEnabled()) {
     try {
@@ -89,7 +82,6 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
 
   const verbatim = spoken.join("\n\n");
   let reply = verbatim; let rev: Review | null = null; let drafts: Draft[] = [];
-  // fixed system lines (decline, hole, tree changed, didn't-catch prefix alone) are sent as written; squares are paraphrased
   const fixed = [DECLINE_REPLY, HOLE_REPLY, TREE_CHANGED, "Okay. If it gets tight, call 2-1-1 (24/7) for local help. Take care."];
   const isFixed = fixed.includes(verbatim.trim()) || spoken.every((x) => fixed.includes(x.trim()));
   if (!opts.verbatimOnly && verbatim.trim() && !isFixed) {
@@ -102,21 +94,18 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
     } catch (e) { rev = { used: "verbatim", code_ok: false, reason: "writer error: " + (e as Error).message }; }
   }
   setState(chat.id, s, s.done ? "done" : "open");
-  // reply is what the resident sees and what later turns get as context; verbatim + drafts stay in the database for the backend
   addMessage(chat.id, "assistant", reply, nodeIds.join(","), { verbatim, review: rev, drafts });
   return { chatId: chat.id, reply, verbatim, review: rev, status: s.done ? "done" : "open", state: s, nodeIds, read: r.raw ?? r };
 }
 
-/** Move to the selected squares: leaves are all spoken and the chat ends; a single step square is spoken and waited on. */
 function advance(T: Tree, targets: TreeNode[], s: State, say: (n: TreeNode) => void, finish: (why: string) => void) {
   if (!targets.length) { say({ id: "__dead_end__", text: "" } as TreeNode); finish("dead_end"); s.nodeId = null; return; }
   const steps = targets.filter((n) => !T.isLeaf(n.id));
   const leaves = targets.filter((n) => T.isLeaf(n.id));
   for (const n of leaves) say(n);
   if (steps.length) {
-    const next = steps[0];                       // several step squares on one pick: take the first, note the rest in the path
+    const next = steps[0];
     say(next); s.nodeId = next.id;
-    // a step with a single unlabeled arrow is just "say this, then continue": wait for the resident anyway (they may need to answer it)
   } else {
     s.nodeId = null; finish(leaves.some((n) => isHole(n)) ? "hole" : "answer");
   }

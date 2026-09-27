@@ -7,8 +7,8 @@ export interface Env {
   APP_NAME: string;
   EMAIL_PROVIDER: string;
   EMAIL_FROM: string;
-  /** Dev only: origin of `next dev`, allowed for CORS with credentials. Empty in production. */
   DEV_ORIGIN: string;
+  DEV_USER?: string;
   WORKSPACE_PASSWORD: string;
   SESSION_SECRET: string;
 }

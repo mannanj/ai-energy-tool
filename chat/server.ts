@@ -1,19 +1,3 @@
-/**
- * Local chat server for the electric-bill helper.
- *
- *  GET  /                 chat page
- *  GET  /c/:id            shared transcript (read-only) + "start your own chat"
- *  GET  /chats            gallery of saved chats
- *  POST /api/chat         { chatId?, message } → { chatId, reply, status: open|done }
- *  GET  /api/chats        list
- *  GET  /api/chats/:id    one chat with messages
- *  POST /api/chats/:id/share  mark shared, return link
- *  GET  /api/chats/:id.txt    plain transcript
- *  GET  /api/tree         the tree document in use (+ holes / unreachable report)
- *  GET  /api/admin/chats  every chat with the tree squares each reply came from
- *
- * Run: bun server.ts   (reads chat/.env)
- */
 import { archiveAllBut, getChat, getMessages, listChats, setArchived, shareChat, transcript } from "./lib/db";
 import { runTurn, READER, ensureTree, tree, treeSource } from "./lib/turn";
 import { isHole, validate, activePath } from "./lib/tree";

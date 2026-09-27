@@ -1,5 +1,3 @@
-// Two Yjs clients join the same room; A writes a node + cursor, B must see both.
-// Then both leave, C joins fresh and must see A's node (persistence through onSave/onLoad).
 import * as Y from "yjs";
 import YProvider from "y-partyserver/provider";
 import { Awareness } from "y-protocols/awareness";
@@ -22,25 +20,21 @@ const A = client("Alice"), B = client("Bob");
 await until(() => A.provider.synced && B.provider.synced, 10000, "initial sync");
 console.log("A+B synced in", Date.now() - t0, "ms");
 
-// A writes a square
 const tw = Date.now();
 A.nodes.set("n1", { id: "n1", text: "Top level question?", x: 0, y: 0, width: 240, height: 120 });
 await until(() => B.nodes.get("n1")?.text === "Top level question?", 5000, "B sees A's node");
 console.log("B saw A's node in", Date.now() - tw, "ms");
 
-// A moves cursor; B must see it in awareness
 const tc = Date.now();
 A.awareness.setLocalStateField("cursor", { x: 123, y: 456 });
 await until(() => [...B.awareness.getStates().values()].some((s) => s.cursor?.x === 123 && s.user?.name === "Alice"), 5000, "B sees A's cursor");
 console.log("B saw A's cursor in", Date.now() - tc, "ms; peers seen by B:", B.awareness.getStates().size);
 
-// concurrent edits from both sides converge
 A.nodes.set("n2", { id: "n2", text: "from A" });
 B.nodes.set("n3", { id: "n3", text: "from B" });
 await until(() => A.nodes.size === 3 && B.nodes.size === 3, 5000, "converge");
 console.log("converged: both see 3 nodes");
 
-// leave, let server save, then a fresh client must load persisted state
 A.provider.destroy(); B.provider.destroy();
 await wait(3000);
 const C = client("Carol");

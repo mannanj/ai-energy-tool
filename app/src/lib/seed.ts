@@ -28,7 +28,6 @@ export function mkEdge(treeId: string, source: string, target: string, label?: s
   return { id: nanoid(10), treeId, source, target, label, createdAt: now() };
 }
 
-/** Empty canvas: one required root square. */
 export function emptyDocument(name = "Rates went up"): TreeDocument {
   const treeId = nanoid(8);
   const root = mkNode(treeId, { x: 0, y: 0, isRoot: true, width: 360, height: 120 });
@@ -41,7 +40,6 @@ export function emptyDocument(name = "Rates went up"): TreeDocument {
   };
 }
 
-/** The Fairfax / Dominion tree from context/decision-tree-assistance.md, top two levels. */
 export function exampleDocument(): TreeDocument {
   const doc = emptyDocument("Rates went up (example)");
   const T = doc.tree.id;

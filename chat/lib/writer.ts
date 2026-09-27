@@ -1,8 +1,3 @@
-/**
- * DeepSeek writes the helper's reply in its own voice from a square's text; Jev reviews it.
- * If the review fails (a fact dropped, a fact added, wrong shape) the square's verbatim text is sent instead.
- * Two guards: a code check that every number/link in the reply exists in the facts, then Jev's judgment.
- */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { complete, type ChatMessage } from "./llm";
@@ -11,19 +6,16 @@ const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 const RULES = (() => { try { return readFileSync(resolve(import.meta.dir, "../../context/system-prompt.md"), "utf8"); } catch { return ""; } })();
 const API = "https://api.typesafe.ai/v1/systemone";
 
-/** tone = "asks exactly what the square asks" for a step, "gives the outcome and stops" for an answer. */
 export interface Review { used: "written" | "verbatim"; code_ok: boolean; covers?: number; adds_nothing?: number; tone?: number; plain?: number; reason?: string; written?: string; attempts?: number; passed?: boolean; simplified?: boolean }
-/** Every text the pipeline produced for one reply, in order, with its review. Kept in the database, never shown to the resident. */
 export interface Draft { stage: "write" | "simplify" | "verbatim"; text: string; review: Omit<Review, "written"> }
 
 const digits = (t: string) => {
   const out = new Set((t.match(/\d[\d,.\-() ]{5,}\d|\b\d{3,}\b|\$\s?\d[\d,]*/g) ?? []).map((x) => x.replace(/\D/g, "")).map((x) => (x.length === 11 && x.startsWith("1") ? x.slice(1) : x)).filter((x) => x.length >= 3));
-  for (const m of t.matchAll(/\$?\s?(\d+(?:\.\d+)?)\s?k\b/gi)) out.add(String(Math.round(Number(m[1]) * 1000)));   // "$7k" -> 7000
+  for (const m of t.matchAll(/\$?\s?(\d+(?:\.\d+)?)\s?k\b/gi)) out.add(String(Math.round(Number(m[1]) * 1000)));
   return out;
 };
 const links = (t: string) => new Set((t.match(/[a-z0-9.-]+\.(?:gov|org|com|net)\b[^\s)*]*/gi) ?? []).map((x) => x.toLowerCase().replace(/[.,*]+$/, "")));
 
-/** Numbers and links in the reply must come from the square or already be in the conversation (either side). */
 export function codeCheck(facts: string, reply: string, conversation: string): { ok: boolean; reason?: string } {
   const fd = new Set([...digits(facts), ...digits(conversation)]), fl = new Set([...links(facts), ...links(conversation)]);
   for (const d of digits(reply)) if (![...fd].some((f) => f.includes(d) || d.includes(f))) return { ok: false, reason: "number not in square: " + d };
@@ -57,15 +49,9 @@ export async function write(facts: string, history: ChatMessage[], kind: "step" 
   return (await complete(MODEL, messages, { temperature: 0.4, maxTokens: 500 })).trim();
 }
 
-/**
- * Always paraphrase: write, review, and retry with the reviewer's objection up to `attempts` times.
- * The best attempt that passes the code check is sent even if Jev's scores stay under the bar (flagged passed=false).
- * Raw square text goes out only when every attempt invented a number or link.
- */
 export async function writeReviewed(facts: string, history: ChatMessage[], kind: "step" | "answer" | "decline", saidByResident = "", attempts = 3): Promise<Review & { drafts: Draft[] }> {
   const drafts: Draft[] = [];
   const keep = (stage: Draft["stage"], r: Review) => { const { written, ...rest } = r; drafts.push({ stage, text: written ?? "", review: rest }); };
-  /** Final stage: if Jev still smells filler, one plain-language rewrite; use it when it survives the code check. */
   const finish = async (r: Review): Promise<Review & { drafts: Draft[] }> => {
     if ((r.plain ?? 1) >= 0.5 || !r.written) return { ...r, drafts };
     const plainText = await simplify(r.written, facts);
@@ -91,7 +77,6 @@ export async function writeReviewed(facts: string, history: ChatMessage[], kind:
   return { ...best!, used: "verbatim", drafts };
 }
 
-/** Follow-on call: strip filler, keep every fact. */
 export async function simplify(text: string, facts: string): Promise<string> {
   const messages: ChatMessage[] = [
     { role: "system", content: "Rewrite the message in plain, direct language. Remove every filler phrase, sympathy opener, restatement of what the person said, and any team label (like \"Step 0\" or \"Branch A\"). Keep every phone number, link, email, dollar amount, date, percentage, program name and question exactly as written. Keep the same language. Output only the rewritten message.\n\nFor reference, the facts it must still contain:\n" + facts },

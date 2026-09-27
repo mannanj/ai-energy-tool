@@ -1,10 +1,3 @@
-/**
- * Two cookies, both HMAC-signed and self-contained, so the WebSocket route can check them
- * without a database read.
- *   aet_gate     "the shared workspace password was entered in this browser"   30 days
- *   aet_session  who this person is (id, name, email, color)                    30 days
- * Magic-link tokens live in D1, hashed, single use.
- */
 import type { Env } from "./env";
 
 export const GATE_COOKIE = "aet_gate";
@@ -59,6 +52,7 @@ export async function gateCookie(env: Env, secure: boolean) {
   return setCookie(GATE_COOKIE, await sign({ g: 1, exp: Math.floor(Date.now() / 1000) + GATE_TTL_S }, env.SESSION_SECRET), GATE_TTL_S, secure);
 }
 export async function hasGate(req: Request, env: Env) {
+  if (devUser(env)) return true;
   return !!(await verify<{ exp: number }>(readCookie(req, GATE_COOKIE), env.SESSION_SECRET));
 }
 export async function sessionCookie(env: Env, user: Omit<SessionUser, "exp">, secure: boolean) {
@@ -66,10 +60,19 @@ export async function sessionCookie(env: Env, user: Omit<SessionUser, "exp">, se
   return setCookie(SESSION_COOKIE, await sign(payload, env.SESSION_SECRET), SESSION_TTL_S, secure);
 }
 export async function getSession(req: Request, env: Env): Promise<SessionUser | null> {
-  return verify<SessionUser>(readCookie(req, SESSION_COOKIE), env.SESSION_SECRET);
+  const s = await verify<SessionUser>(readCookie(req, SESSION_COOKIE), env.SESSION_SECRET);
+  if (s) return s;
+  const dev = devUser(env);
+  if (!dev) return null;
+  const u = await upsertUser(env.DB, dev.firstName, dev.lastName, dev.email);
+  return { id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, color: u.color, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S };
 }
 
-/** Constant-time-ish compare for the shared password. */
+function devUser(env: Env): { firstName: string; lastName: string; email: string } | null {
+  const m = env.DEV_USER?.trim().match(/^(\S+)\s+(.+?)\s*<([^>\s]+@[^>\s]+)>$/);
+  return m ? { firstName: m[1], lastName: m[2], email: m[3] } : null;
+}
+
 export function passwordMatches(given: string, expected: string): boolean {
   if (!expected) return false;
   const a = enc.encode(given), b = enc.encode(expected);
@@ -77,8 +80,6 @@ export function passwordMatches(given: string, expected: string): boolean {
   for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
   return diff === 0;
 }
-
-/* ---------- users + magic links (D1) ---------- */
 
 const COLORS = ["#e11d48", "#d97706", "#059669", "#0284c7", "#7c3aed", "#db2777", "#0d9488", "#ea580c", "#4f46e5", "#65a30d"];
 const now = () => new Date().toISOString();
@@ -116,7 +117,6 @@ export async function createLoginToken(db: D1Database, userId: string): Promise<
   return token;
 }
 
-/** Burn the token first so two clicks cannot both win. */
 export async function consumeLoginToken(db: D1Database, token: string): Promise<DbUser | null> {
   const hash = await sha256(token);
   const burn = await db.prepare("UPDATE login_token SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?")

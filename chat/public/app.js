@@ -17,7 +17,6 @@
   const m = location.pathname.match(/^\/c\/([A-Za-z0-9]+)/);
   if (m) loadShared(m[1]); else showIntro();
 
-  // Tiny safe markdown: escape everything, then bold, links, bullets, line breaks.
   function render(text) {
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return esc(text)

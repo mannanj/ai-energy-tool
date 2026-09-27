@@ -1,12 +1,4 @@
 "use client";
-/**
- * Multiplayer store. State lives in a Yjs document synced through the TreeRoom Durable Object
- * (partyserver). Zustand mirrors the Yjs maps into plain arrays for React, and every mutation
- * writes back into Yjs. Awareness carries presence: user, cursor, and which square they are typing in.
- *
- * Yjs maps: meta {id,name,rootNodeId,...}, nodes {id -> TreeNode}, edges {id -> TreeEdge}, locks {nodeId -> NodeLock},
- * bubbles {"chatId:seq" -> {x,y}}: where a chat bubble was dragged to on the canvas (the chat plugin; chats themselves live in the chat server)
- */
 import { create } from "zustand";
 import * as Y from "yjs";
 import YProvider from "y-partyserver/provider";
@@ -25,15 +17,12 @@ export interface Peer {
 
 interface State {
   doc: TreeDocument;
-  /** first sync with the room finished */
   hydrated: boolean;
   connected: boolean;
   me: Me | null;
   peers: Peer[];
   locks: Record<NodeId, NodeLock>;
-  /** chat bubble positions on the canvas, shared like squares */
   bubblePos: Record<string, { x: number; y: number }>;
-  /** ticks every 10s so lock expiry re-renders */
   now: number;
 
   selectedNodeId: NodeId | null;
@@ -75,7 +64,6 @@ interface State {
 const now = () => new Date().toISOString();
 const emptyDoc = (): TreeDocument => ({ version: 1, tree: { id: TREE_ID, name: "", rootNodeId: "", createdAt: "", updatedAt: "" }, nodes: [], edges: [] });
 
-// module-level Yjs handles (one room per window)
 let ydoc: Y.Doc | null = null;
 let provider: YProvider | null = null;
 let awareness: Awareness | null = null;
@@ -84,7 +72,6 @@ const maps = () => {
   return { meta: ydoc.getMap<unknown>("meta"), nodes: ydoc.getMap<TreeNode>("nodes"), edges: ydoc.getMap<TreeEdge>("edges"), locks: ydoc.getMap<NodeLock>("locks"), bubbles: ydoc.getMap<{ x: number; y: number }>("bubbles") };
 };
 
-/** A lock counts only while fresh. */
 export function isLockActive(lock: NodeLock | undefined, at = Date.now()): lock is NodeLock {
   return !!lock && at - Date.parse(lock.lastActivityAt) < LOCK_TIMEOUT_MS;
 }
@@ -158,7 +145,6 @@ export const useTreeStore = create<State>((set, get) => {
           peers.push({ clientId, user: st.user, cursor: st.cursor ?? null, editingNodeId: st.editingNodeId ?? null });
         }
         set({ peers });
-        // release locks whose holder left (after a 10s grace so a reconnect does not drop a live lock)
         if (get().hydrated) {
           for (const [nodeId, lock] of locks.entries()) {
             if (!present.has(lock.userId) && Date.now() - Date.parse(lock.lastActivityAt) > 10_000) tx(() => locks.delete(nodeId));
@@ -234,7 +220,7 @@ export const useTreeStore = create<State>((set, get) => {
     deleteNode: (id) => {
       const { nodes, edges, locks } = maps();
       if (nodes.get(id)?.isRoot) return;
-      if (isLockActive(locks.get(id)) && locks.get(id)!.userId !== meId()) return; // someone is typing in it
+      if (isLockActive(locks.get(id)) && locks.get(id)!.userId !== meId()) return;
       tx(() => {
         nodes.delete(id); locks.delete(id);
         for (const [eid, e] of edges.entries()) if (e.source === id || e.target === id) edges.delete(eid);
@@ -255,7 +241,6 @@ export const useTreeStore = create<State>((set, get) => {
     },
     deleteEdge: (id) => tx(() => maps().edges.delete(id)),
 
-    /** Returns true if we now hold the lock. */
     acquireLock: (nodeId) => {
       const me = get().me; if (!me || !ydoc) return false;
       const { locks } = maps();
@@ -271,7 +256,7 @@ export const useTreeStore = create<State>((set, get) => {
       const { locks } = maps();
       const cur = locks.get(nodeId);
       if (!cur || cur.userId !== me.id) return;
-      if (Date.now() - Date.parse(cur.lastActivityAt) < 3000) return; // throttle writes
+      if (Date.now() - Date.parse(cur.lastActivityAt) < 3000) return;
       tx(() => locks.set(nodeId, { ...cur, lastActivityAt: now() }));
     },
     releaseLock: (nodeId) => {
@@ -292,7 +277,6 @@ export const useTreeStore = create<State>((set, get) => {
   };
 });
 
-/** Lock state for one square from the point of view of the current user. */
 export function useLock(nodeId: NodeId): { lockedBy: NodeLock | null; mine: boolean } {
   const lock = useTreeStore((s) => s.locks[nodeId]);
   const me = useTreeStore((s) => s.me);

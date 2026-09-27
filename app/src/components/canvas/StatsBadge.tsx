@@ -2,7 +2,6 @@
 import { Panel } from "@xyflow/react";
 import { useTreeStore } from "@/lib/store";
 
-/** Counts shown on the canvas: squares, arrows, text labels. */
 export function StatsBadge() {
   const squares = useTreeStore((s) => s.doc.nodes.length);
   const arrows = useTreeStore((s) => s.doc.edges.length);

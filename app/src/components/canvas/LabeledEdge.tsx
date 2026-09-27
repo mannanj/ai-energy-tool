@@ -2,7 +2,6 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
 import { useTreeStore } from "@/lib/store";
 
-/** Arrow parent → child. When selected, a small input lets you label it (e.g. Yes / No). */
 export function LabeledEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, selected, markerEnd }: EdgeProps) {
   const setEdgeLabel = useTreeStore((s) => s.setEdgeLabel);
   const [path, lx, ly] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 12 });

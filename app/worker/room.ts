@@ -1,18 +1,3 @@
-/**
- * One Durable Object per tree. Yjs document with maps: meta, nodes, edges, locks.
- * Persists to the DO's own SQLite. Seeds the required root square on first load.
- *
- * Version history lives in the same SQLite: an automatic snapshot at most once a minute while the
- * tree changes, plus named checkpoints (before reset, before restore, or on request). Restore rewrites
- * the live Yjs maps from a snapshot, so connected editors see it immediately.
- *
- * HTTP (non-WebSocket) routes, reached through the Worker's /api/tree/:id/*:
- *   GET  /export                      current tree as JSON
- *   GET  /versions                    list (newest first)
- *   GET  /versions/:n                 one snapshot as JSON
- *   POST /versions {label}            save a checkpoint now
- *   POST /versions/:n/restore         restore (saves a "before restore" checkpoint first)
- */
 import { Server } from "partyserver";
 import { withYjs } from "y-partyserver";
 import * as Y from "yjs";
@@ -45,15 +30,12 @@ export class TreeRoom extends withYjs(Server) {
     this.snapshotIfDue();
   }
 
-  /* ---------- versions ---------- */
-
   private lastVersion(): { n: number; created_at: string; hash: string } | null {
     const r = this.ctx.storage.sql.exec("SELECT n, created_at, hash FROM versions ORDER BY n DESC LIMIT 1").toArray();
     return r.length ? (r[0] as unknown as { n: number; created_at: string; hash: string }) : null;
   }
 
   private contentHash(doc: TreeDocument): string {
-    // positions and sizes count as changes too; only timestamps are stripped so idle re-saves do not pile up
     const strip = (o: object) => JSON.stringify(o, (k, v) => (k === "updatedAt" || k === "createdAt" || k === "updatedBy" ? undefined : v));
     const s = strip({ nodes: [...doc.nodes].sort((a, b) => a.id.localeCompare(b.id)), edges: [...doc.edges].sort((a, b) => a.id.localeCompare(b.id)), root: doc.tree.rootNodeId, name: doc.tree.name });
     let h = 2166136261;
@@ -61,7 +43,6 @@ export class TreeRoom extends withYjs(Server) {
     return h.toString(16) + ":" + s.length;
   }
 
-  /** Save a version. Returns null when nothing changed since the last one (unless forced). */
   saveVersion(label: string, author: string, force = false): number | null {
     const doc = this.snapshot();
     const hash = this.contentHash(doc);
@@ -72,7 +53,6 @@ export class TreeRoom extends withYjs(Server) {
       new Date().toISOString(), label, author, doc.nodes.length, doc.edges.length, hash, JSON.stringify(doc),
     );
     const n = this.lastVersion()!.n;
-    // keep the newest KEEP_VERSIONS, but never drop named checkpoints
     this.ctx.storage.sql.exec(
       "DELETE FROM versions WHERE label = 'auto' AND n NOT IN (SELECT n FROM versions ORDER BY n DESC LIMIT ?)", TreeRoom.KEEP_VERSIONS,
     );
@@ -97,7 +77,6 @@ export class TreeRoom extends withYjs(Server) {
     return r.length ? (JSON.parse(r[0].data as string) as TreeDocument) : null;
   }
 
-  /** Rewrite the live maps from a snapshot. Locks are cleared; editors get the new content instantly. */
   restore(doc: TreeDocument) {
     const nodes = this.document.getMap("nodes"), edges = this.document.getMap("edges"), locks = this.document.getMap("locks"), meta = this.document.getMap("meta");
     this.document.transact(() => {

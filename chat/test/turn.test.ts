@@ -1,4 +1,3 @@
-/** Walker tests with a scripted reader and the writer off. Uses a throwaway DB and the fixture tree. */
 import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

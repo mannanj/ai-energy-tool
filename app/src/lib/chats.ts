@@ -1,9 +1,4 @@
 "use client";
-/**
- * The chat plugin's data: chats live in the chat server (../chat, SQLite), not in the tree document.
- * This store fetches them, keeps which chats are drawn on the canvas, and calls rerun / run.
- * Bubble positions are the one thing shared through the tree document (store.ts, Yjs map "bubbles").
- */
 import { create } from "zustand";
 
 export const CHAT_ORIGIN = process.env.NEXT_PUBLIC_CHAT_ORIGIN || "http://localhost:8972";
@@ -25,7 +20,6 @@ interface State {
   visits: Record<string, number>;
   holes: string[];
   scenarios: Scenario[];
-  /** chat ids drawn on the canvas, in colour order */
   shown: string[];
   current: string | null;
   showArchived: boolean;

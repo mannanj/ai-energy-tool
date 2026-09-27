@@ -2,7 +2,6 @@
 import { ViewportPortal, useViewport } from "@xyflow/react";
 import { useTreeStore } from "@/lib/store";
 
-/** Other people's cursors, drawn in canvas coordinates so they stay put when you pan or zoom. */
 export function Cursors() {
   const peers = useTreeStore((s) => s.peers);
   const { zoom } = useViewport();

@@ -13,7 +13,6 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   return { status: res.status, data };
 }
 
-/** Where the WebSocket provider connects: host only, no protocol. */
 export function partyHost(): string {
   const origin = WORKER_ORIGIN || (typeof window !== "undefined" ? window.location.origin : "");
   return origin.replace(/^https?:\/\//, "");

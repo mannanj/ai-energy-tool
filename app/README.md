@@ -32,10 +32,12 @@ document (Yjs map `bubbles`). "rerun from here" replays a chat through the curre
 cd app && bun install
 bun run build                                   # static export → out/
 bunx wrangler d1 migrations apply ai-energy-tool --local
-bunx wrangler dev --port 8971                   # http://localhost:8971, password "letmein" (.dev.vars)
+bunx wrangler dev --port 8971                   # http://localhost:8971, no password or sign-in: DEV_USER in .dev.vars
 ```
 
-`.dev.vars` sets `EMAIL_PROVIDER=console`, so the sign-in page shows the magic link inline instead of emailing it.
+`.dev.vars` sets `DEV_USER=First Last <email>`, which opens the gate and signs every request in as that user, so
+the editor loads straight away. Remove the line to test the real flow: `EMAIL_PROVIDER=console` then shows the
+magic link inline on the sign-in page instead of emailing it, and the password is `WORKSPACE_PASSWORD`.
 
 For fast UI iteration run `bun run dev -p 3010` alongside wrangler; `.env.development` points the page at
 `localhost:8971` for the API and WebSocket (CORS is allowed for `DEV_ORIGIN` in `.dev.vars`). For the chat

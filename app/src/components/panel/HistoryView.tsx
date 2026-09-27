@@ -3,10 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { formatWhen, listVersions, restoreVersion, saveCheckpoint, type VersionInfo } from "@/lib/versions";
 import { useTreeStore } from "@/lib/store";
 
-/**
- * Version history. Automatic snapshots land at most once a minute while the tree changes;
- * checkpoints are saved on request and before every reset, example load, or restore.
- */
 export function HistoryView() {
   const [versions, setVersions] = useState<VersionInfo[] | null>(null);
   const [label, setLabel] = useState("");

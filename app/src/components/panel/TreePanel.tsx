@@ -12,11 +12,9 @@ const ADD_PLACEHOLDER =
   "Add a square. Paste or type text and links here, for example a question, an answer, a phone number, or a source URL like https://www.dss.virginia.gov/relief/pipp/. Links become pills you can copy and share. Press Cmd/Ctrl+Enter to add.";
 
 interface Props {
-  /** true when rendered in its own window: no close/pop-out/expand/resize chrome */
   popout?: boolean;
 }
 
-/** Right-side tree panel: detailed list view, filter, edit, add squares via text area. */
 export function TreePanel({ popout = false }: Props) {
   const doc = useTreeStore((s) => s.doc);
   const selectedNodeId = useTreeStore((s) => s.selectedNodeId);
@@ -53,7 +51,6 @@ export function TreePanel({ popout = false }: Props) {
     try { await navigator.clipboard.writeText(toMarkdown(list)); setCopiedAll(true); setTimeout(() => setCopiedAll(false), 1200); } catch {}
   };
 
-  // drag left edge to resize
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
   const onResizeStart = (e: React.MouseEvent) => {
     dragRef.current = { startX: e.clientX, startW: width };
@@ -82,7 +79,6 @@ export function TreePanel({ popout = false }: Props) {
         <div onMouseDown={onResizeStart} title="Drag to resize" className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-col-resize hover:bg-sky-300/60" />
       )}
 
-      {/* header */}
       <div className="flex items-center gap-1 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
         <span className="truncate text-[13px] font-medium">{doc.tree.name}</span>
         <span className="ml-1 text-[11px] text-neutral-500">{doc.nodes.length} squares</span>
@@ -114,7 +110,6 @@ export function TreePanel({ popout = false }: Props) {
       {view === "history" && <HistoryView />}
       {view === "chats" && <ChatsView />}
       {view === "tree" && <>
-      {/* add box */}
       <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
         <textarea
           value={draft}
@@ -135,7 +130,6 @@ export function TreePanel({ popout = false }: Props) {
         </div>
       </div>
 
-      {/* filter */}
       <div className="px-3 py-2">
         <input
           value={filter}
@@ -145,7 +139,6 @@ export function TreePanel({ popout = false }: Props) {
         />
       </div>
 
-      {/* list */}
       <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-6">
         {list.map((d) => (
           <NodeRow key={d.node.id} d={d} dim={!matches(d.node.text)} />

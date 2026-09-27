@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { api, type Me } from "./api";
 import { useTreeStore } from "./store";
 
-/** Checks the cookie session with the Worker, redirects to /gate or /signin if missing, then joins the room. */
 export function useSession(): { me: Me | null; status: "loading" | "ready" | "redirecting" } {
   const [me, setMe] = useState<Me | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "redirecting">("loading");

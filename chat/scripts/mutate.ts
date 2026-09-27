@@ -1,7 +1,3 @@
-/**
- * Mutation testing, small and honest: each mutant changes one line of lib/, the unit tests run,
- * and a mutant that survives means the tests would not notice that bug. Run: bun scripts/mutate.ts
- */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -25,9 +21,7 @@ const MUTANTS: Mutant[] = [
   { file: "turn.ts", find: 'const leaves = targets.filter((n) => T.isLeaf(n.id));', replace: 'const leaves = targets.filter((n) => T.isLeaf(n.id)).slice(0, 1);', why: "only first leaf spoken" },
   { file: "turn.ts", find: 'if (chat.status === "done" || s.done) {', replace: 'if (false) {', why: "ended chat keeps going" },
   { file: "turn.ts", find: 'if (!cur) {', replace: 'if (false) {', why: "tree change crashes" },
-  // Not listed: the link regex's "*" exclusion and the phone leading-1 normalization. Each is double-defended
-  // (a second check catches the same case), so a single mutation there cannot change behaviour.
-  { file: "writer.ts", find: '...digits(saidByResident)', replace: '...digits("")', why: "resident's own numbers rejected" },
+  { file: "writer.ts", find: '...digits(conversation)]', replace: '...digits("")]', why: "resident's own numbers rejected" },
   { file: "writer.ts", find: 'return { ok: false, reason: "leaked tag" };', replace: 'return { ok: true };', why: "leaked tags pass" },
   { file: "writer.ts", find: 'reply.length > Math.max(900, facts.length * 2.2)', replace: 'false', why: "no length cap" },
 ];

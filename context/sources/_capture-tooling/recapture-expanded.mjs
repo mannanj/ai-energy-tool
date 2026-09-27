@@ -1,4 +1,3 @@
-// Recapture Dominion pages with all accordions expanded; save PDF, full-DOM innerText, and raw HTML.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
 const items = [
@@ -11,9 +10,7 @@ for (const [name, url] of items) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(4000);
-    // dismiss cookie banner if present
     for (const sel of ['button:has-text("Accept")', 'button:has-text("I Agree")', '#onetrust-accept-btn-handler']) { try { await page.locator(sel).first().click({ timeout: 1500 }); } catch {} }
-    // expand every accordion / details / aria-expanded=false control
     const n = await page.evaluate(() => {
       let c = 0;
       document.querySelectorAll('details').forEach(d => { d.open = true; c++; });

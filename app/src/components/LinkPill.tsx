@@ -2,10 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import { shortLabel, toHref } from "@/lib/links";
 
-/**
- * Link pill (Event Every style): label, hover shows the full URL,
- * copy icon on the right, then a triple-dot menu with Share / Open / Remove.
- */
 export function LinkPill({ url, onRemove }: { url: string; onRemove?: () => void }) {
   const [menu, setMenu] = useState(false);
   const [copied, setCopied] = useState(false);

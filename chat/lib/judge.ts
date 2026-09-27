@@ -1,8 +1,3 @@
-/**
- * The readers. Jev (TypeSafe System One) when TYPESAFE_API_KEY is set, else DeepSeek returning JSON.
- * Both only PICK: which arrow label a reply matches, whether a first message is about the root question,
- * whether a reply is off topic or a goodbye, and what language it is in. Neither writes the helper's words.
- */
 import { complete, type ChatMessage } from "./llm";
 
 const API = "https://api.typesafe.ai/v1/systemone";
@@ -11,12 +6,11 @@ export const jevEnabled = () => !!process.env.TYPESAFE_API_KEY;
 export const readerName = () => (jevEnabled() ? (process.env.TYPESAFE_MODEL ?? "jev-latest") : MODEL);
 
 export interface Read {
-  /** picked arrow label, or null when nothing matched */
   label: string | null;
-  onTopic: boolean;      // first message: is it the root question / an electric bill problem
-  offTopic: boolean;     // this message is about something else entirely
-  bye: boolean;          // wrapping up
-  language: string;      // "en", "es", ...
+  onTopic: boolean;
+  offTopic: boolean;
+  bye: boolean;
+  language: string;
   confidence?: number;
   raw?: unknown;
 }
@@ -36,12 +30,6 @@ async function jev(state: unknown, questions: Record<string, Q>): Promise<Record
   return ((await res.json()) as { answers: Record<string, Ans> }).answers;
 }
 
-/**
- * @param text       the resident's message
- * @param said       what the helper just said (the current square's text), or the root question on the first message
- * @param options    the arrow labels leaving the current square, with what each leads to
- * @param first      true on the resident's first message
- */
 export async function read(text: string, said: string, options: Option[], first: boolean): Promise<Read> {
   const state = {
     context: "Online helper for Fairfax County residents about their Dominion Energy electric bill. The helper follows a fixed decision tree.",
@@ -75,7 +63,6 @@ async function readWithJev(state: Record<string, unknown>, options: Option[], cr
   }
 }
 
-/** Fallback reader: DeepSeek returning JSON. */
 async function readWithLlm(text: string, said: string, options: Option[], crit: Record<string, string>, first: boolean): Promise<Read> {
   const sys = `You read one message from a resident chatting with an electric-bill helper. Return ONLY a JSON object:
 {"label": one of ${JSON.stringify([...options.map((o) => o.label), null])}, "on_topic": true|false, "off_topic": true|false, "bye": true|false, "language": "en"|"es"|other}
@@ -91,7 +78,6 @@ async function readWithLlm(text: string, said: string, options: Option[], crit: 
   } catch { return { label: null, onTopic: !first, offTopic: false, bye: false, language: "en" }; }
 }
 
-/** Translate a finished reply; content is fixed, only the language changes. */
 export async function translate(text: string, lang: string): Promise<string> {
   const messages: ChatMessage[] = [
     { role: "system", content: `Translate the message into the language with ISO code "${lang}". Keep every phone number, URL, email, date, dollar amount and **bold** marker exactly as written. Output only the translation.` },
