@@ -19,7 +19,8 @@ header nav a { font-size: 13px; margin-left: 12px; }
 main { flex: 1; padding: 16px 0 120px; }
 .msg { display: flex; margin: 10px 0; }
 .msg.user { justify-content: flex-end; }
-.bubble { max-width: 85%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; border: 1px solid var(--line); }
+.bubble ul { margin: 6px 0; padding-left: 20px; }
+.bubble { max-width: 85%; padding: 10px 14px; border-radius: 14px; word-wrap: break-word; border: 1px solid var(--line); }
 .msg.user .bubble { background: var(--user); border-bottom-right-radius: 4px; }
 .msg.assistant .bubble { background: var(--bot); border-bottom-left-radius: 4px; }
 .bubble .who { font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
@@ -45,3 +46,5 @@ button:disabled { opacity: .5; cursor: default; }
 .list .t { font-weight: 600; }
 .list .m { color: var(--muted); font-size: 13px; margin-top: 4px; }
 .footnote { color: var(--muted); font-size: 12px; margin-top: 24px; }
+.ended { margin: 14px 0; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 14px; }
+.ended a { margin-left: 8px; font-weight: 600; }

@@ -1,4 +1,6 @@
-/** Minimal OpenRouter chat-completions client. Streaming yields text deltas; complete() returns the full text. */
+/** Minimal OpenRouter chat-completions client. Reasoning is switched off: DeepSeek V4 Flash otherwise spends the
+ *  token budget on hidden reasoning and can return an empty visible reply.
+ * Streaming yields text deltas; complete() returns the full text. */
 export interface ChatMessage { role: "system" | "user" | "assistant"; content: string; }
 
 const API = "https://openrouter.ai/api/v1/chat/completions";
@@ -17,7 +19,7 @@ function headers() {
 export async function complete(model: string, messages: ChatMessage[], opts: { temperature?: number; maxTokens?: number } = {}): Promise<string> {
   const res = await fetch(API, {
     method: "POST", headers: headers(),
-    body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.4, max_tokens: opts.maxTokens ?? 700 }),
+    body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.4, max_tokens: opts.maxTokens ?? 1200, reasoning: { enabled: false } }),
   });
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
   const data = await res.json() as { choices: { message: { content: string } }[] };
@@ -27,7 +29,7 @@ export async function complete(model: string, messages: ChatMessage[], opts: { t
 export async function* stream(model: string, messages: ChatMessage[], opts: { temperature?: number; maxTokens?: number } = {}): AsyncGenerator<string> {
   const res = await fetch(API, {
     method: "POST", headers: headers(),
-    body: JSON.stringify({ model, messages, stream: true, temperature: opts.temperature ?? 0.4, max_tokens: opts.maxTokens ?? 700 }),
+    body: JSON.stringify({ model, messages, stream: true, temperature: opts.temperature ?? 0.4, max_tokens: opts.maxTokens ?? 1200, reasoning: { enabled: false } }),
   });
   if (!res.ok || !res.body) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
   const reader = res.body.getReader();

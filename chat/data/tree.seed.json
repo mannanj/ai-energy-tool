@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "tree": {
+    "id": "S65zIuLw",
+    "name": "Rates went up (example)",
+    "rootNodeId": "scTC6Q-gL8",
+    "createdAt": "2026-09-27T15:00:20.827Z",
+    "updatedAt": "2026-09-27T15:00:20.827Z"
+  },
+  "nodes": [
+    {
+      "id": "scTC6Q-gL8",
+      "treeId": "S65zIuLw",
+      "text": "The rates for electricity have increased making it hard to make ends meet, what can I do?",
+      "width": 360,
+      "height": 120,
+      "isRoot": true,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "rvx_rnffi9",
+      "treeId": "S65zIuLw",
+      "text": "Step 0, always first: Do you have a disconnection notice, is your power already off, or does anyone in your home use medical equipment that needs electricity?",
+      "width": 360,
+      "height": 120,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 0,
+      "y": 220
+    },
+    {
+      "id": "eufFqZxtvr",
+      "treeId": "S65zIuLw",
+      "text": "Urgent path. Dominion Energy 866-366-4357 for a payment plan. 2-1-1 Virginia, dial 2-1-1, 24/7. Medical equipment form: demedical@domenergy.com",
+      "width": 240,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": -420,
+      "y": 440
+    },
+    {
+      "id": "QdAIOqOT2V",
+      "treeId": "S65zIuLw",
+      "text": "Screener, one at a time: Dominion or NOVEC? How many people in your home? Total monthly income before taxes? Electric heat or other? Behind on the bill, how much? Anyone 60+, 5 or under, disabled, or a veteran? Own or rent?",
+      "width": 360,
+      "height": 170,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 0,
+      "y": 440
+    },
+    {
+      "id": "5PHGhmbnRI",
+      "treeId": "S65zIuLw",
+      "text": "Is household income at or under 150% of the federal poverty level? (1 person $1,956/mo, 4 people $4,018/mo, state manual 05/25) https://www.dss.virginia.gov/relief/ea/",
+      "width": 360,
+      "height": 130,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 0,
+      "y": 680
+    },
+    {
+      "id": "9xDBdropU2",
+      "treeId": "S65zIuLw",
+      "text": "Branch A: Breathing room from Dominion (any income). Payment plan up to 6 months, Budget Billing. Call 866-366-4357 or dominionenergy.com",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": -800,
+      "y": 900
+    },
+    {
+      "id": "CZspk9f3KZ",
+      "treeId": "S65zIuLw",
+      "text": "Branch B1: PIPP. Pay 10% of income (electric heat) or 6% (other). Apply at commonhelp.virginia.gov. Fairfax DFS 703-324-7500",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": -500,
+      "y": 900
+    },
+    {
+      "id": "jMSWw3HwzQ",
+      "treeId": "S65zIuLw",
+      "text": "Branch B2: Virginia Energy Assistance (Fuel opens Oct 13 to Nov 13, Crisis Nov 1 to mid-March, Cooling Jun 15 to Aug 17). commonhelp.virginia.gov or 833-522-5582",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": -200,
+      "y": 900
+    },
+    {
+      "id": "rIj5g1OTcH",
+      "treeId": "S65zIuLw",
+      "text": "Branch C: EnergyShare (no income limit, need disconnection notice or similar). Heating up to $600, Cooling up to $300. Call 2-1-1 or United Community 703-768-7106",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 100,
+      "y": 900
+    },
+    {
+      "id": "LNB8gwfmI_",
+      "treeId": "S65zIuLw",
+      "text": "Branch D: Local help near 22310. Coordinated Services Planning 703-222-0880. Koinonia 703-971-1991",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 400,
+      "y": 900
+    },
+    {
+      "id": "7phpqocxjC",
+      "treeId": "S65zIuLw",
+      "text": "Branch E: Use less electricity. Weatherization via CHP 888-229-3714. https://www.dhcd.virginia.gov",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 700,
+      "y": 900
+    },
+    {
+      "id": "9hF5qgCe8Y",
+      "treeId": "S65zIuLw",
+      "text": "Nothing matched? Dominion 866-366-4357, CSP 703-222-0880, 2-1-1 Virginia. Fuel Assistance opens Oct 13, 2026.",
+      "width": 280,
+      "height": 150,
+      "isRoot": false,
+      "createdAt": "2026-09-27T15:00:20.827Z",
+      "updatedAt": "2026-09-27T15:00:20.827Z",
+      "x": 1000,
+      "y": 900
+    }
+  ],
+  "edges": [
+    {
+      "id": "n6W_r-t1C-",
+      "treeId": "S65zIuLw",
+      "source": "scTC6Q-gL8",
+      "target": "rvx_rnffi9",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "rAyZ6nBNWh",
+      "treeId": "S65zIuLw",
+      "source": "rvx_rnffi9",
+      "target": "eufFqZxtvr",
+      "label": "Yes",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "R9D6fapBHK",
+      "treeId": "S65zIuLw",
+      "source": "rvx_rnffi9",
+      "target": "QdAIOqOT2V",
+      "label": "No",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "YvzTGTyzZn",
+      "treeId": "S65zIuLw",
+      "source": "QdAIOqOT2V",
+      "target": "5PHGhmbnRI",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "MJgiX5_XSt",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "9xDBdropU2",
+      "label": "Either",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "6Mjt3MtvwZ",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "CZspk9f3KZ",
+      "label": "Yes",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "8micbNDx7m",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "jMSWw3HwzQ",
+      "label": "Yes",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "7A6cLhyPwY",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "rIj5g1OTcH",
+      "label": "Either",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "1QTLhUdNo-",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "LNB8gwfmI_",
+      "label": "Either",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "c_VNEM31_s",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "7phpqocxjC",
+      "label": "Either",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    },
+    {
+      "id": "RvNWWdZBIc",
+      "treeId": "S65zIuLw",
+      "source": "5PHGhmbnRI",
+      "target": "9hF5qgCe8Y",
+      "createdAt": "2026-09-27T15:00:20.827Z"
+    }
+  ]
+}

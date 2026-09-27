@@ -17,6 +17,19 @@
   const m = location.pathname.match(/^\/c\/([A-Za-z0-9]+)/);
   if (m) loadShared(m[1]); else showIntro();
 
+  // Tiny safe markdown: escape everything, then bold, links, bullets, line breaks.
+  function render(text) {
+    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return esc(text)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/(^|[\s(])((?:https?:\/\/|www\.)[^\s<)]+[^\s<).,])/g, (m0, pre, u) => pre + '<a href="' + (u.startsWith("http") ? u : "https://" + u) + '" target="_blank" rel="noopener">' + u + "</a>")
+      .replace(/^(?:\s*)[-*] (.*)$/gm, "<li>$1</li>")
+      .replace(/(<li>.*<\/li>\n?)+/g, (m0) => "<ul>" + m0 + "</ul>")
+      .replace(/^#{1,3} (.*)$/gm, "<strong>$1</strong>")
+      .replace(/\n{2,}/g, "<br><br>").replace(/\n/g, "<br>").replace(/<\/ul><br>/g, "</ul>").replace(/<br><ul>/g, "<ul>");
+  }
+
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
   function showIntro() {
@@ -33,7 +46,7 @@
     const wrap = el("div", "msg " + role);
     const b = el("div", "bubble");
     b.append(el("div", "who", role === "user" ? "You" : "Helper"));
-    const body = el("div", "body", text || "");
+    const body = el("div", "body"); body.raw = text || ""; body.innerHTML = render(body.raw);
     b.append(body);
     wrap.append(b);
     main.append(wrap);
@@ -54,9 +67,8 @@
     banner.append(el("div", null, "")); banner.lastChild.append(a, t);
     main.append(banner);
     for (const msg of c.messages) bubble(msg.role, msg.content);
-    input.placeholder = "Continue this chat…";
-    readOnly = false; // continuing a shared chat appends to it; fine for a local demo
     setLink(c.link);
+    if (c.status === "done") endChat(); else { input.placeholder = "Continue this chat…"; readOnly = false; }
   }
 
   function setLink(link) {
@@ -79,6 +91,17 @@
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(160, input.scrollHeight) + "px"; });
   input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
 
+  function endChat(reason) {
+    input.disabled = true; sendBtn.disabled = true;
+    input.placeholder = "This chat has ended.";
+    const box = el("div", "ended");
+    box.append(el("span", null, reason || "This chat has ended. "));
+    const a = el("a", null, "Start a new chat"); a.href = "/";
+    box.append(a);
+    main.append(box);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -89,28 +112,21 @@
     sendBtn.disabled = true;
     const { b, body } = bubble("assistant", "");
     b.classList.add("typing");
+    let done = false;
     try {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId, message: text }) });
-      if (!res.ok) throw new Error((await res.json()).error || res.statusText);
-      const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
-      while (true) {
-        const { done, value } = await reader.read(); if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let idx;
-        while ((idx = buf.indexOf("\n\n")) >= 0) {
-          const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
-          const ev = /^event: (.*)$/m.exec(chunk)?.[1]; const data = /^data: (.*)$/m.exec(chunk)?.[1];
-          if (!ev || data == null) continue;
-          const d = JSON.parse(data);
-          if (ev === "meta") { chatId = d.chatId; if (!location.pathname.startsWith("/c/")) history.replaceState(null, "", "/c/" + chatId); }
-          else if (ev === "delta") { body.textContent += d; window.scrollTo(0, document.body.scrollHeight); }
-          else if (ev === "error") { body.append(el("div", "error", "Something went wrong: " + d.message + ". If this is urgent, call 2-1-1.")); }
-        }
-      }
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || res.statusText);
+      chatId = d.chatId;
+      if (!location.pathname.startsWith("/c/")) history.replaceState(null, "", "/c/" + chatId);
+      body.raw = d.reply; body.innerHTML = render(body.raw);
+      done = d.status === "done";
     } catch (err) {
       body.append(el("div", "error", "Could not reach the helper: " + err.message + ". If this is urgent, call 2-1-1."));
     } finally {
-      b.classList.remove("typing"); sendBtn.disabled = false; input.focus();
+      b.classList.remove("typing");
+      if (done) endChat(); else { sendBtn.disabled = false; input.focus(); }
+      window.scrollTo(0, document.body.scrollHeight);
     }
   });
 })();

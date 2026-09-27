@@ -4,18 +4,22 @@
  *  GET  /                 chat page
  *  GET  /c/:id            shared transcript (read-only) + "start your own chat"
  *  GET  /chats            gallery of saved chats
- *  POST /api/chat         { chatId?, message } → SSE stream; first event carries chatId
+ *  POST /api/chat         { chatId?, message } → { chatId, reply, status: open|done }
  *  GET  /api/chats        list
  *  GET  /api/chats/:id    one chat with messages
  *  POST /api/chats/:id/share  mark shared, return link
  *  GET  /api/chats/:id.txt    plain transcript
- *  GET  /api/prompt       the system prompt in use (for the team to inspect)
+ *  GET  /admin            read-only tree canvas with chats overlaid
+ *  GET  /api/tree         the tree document in use (+ holes / unreachable report)
+ *  GET  /api/admin/chats  every chat with the tree squares each reply came from
  *
  * Run: bun server.ts   (reads chat/.env)
  */
-import { addMessage, createChat, getChat, getMessages, listChats, shareChat, transcript } from "./lib/db";
-import { buildSystemPrompt } from "./lib/prompt";
-import { stream, type ChatMessage } from "./lib/llm";
+import { archiveAllBut, getChat, getMessages, listChats, setArchived, shareChat, transcript } from "./lib/db";
+import { runTurn, READER, tree, treeSource } from "./lib/turn";
+import { isHole, validate, activePath } from "./lib/tree";
+import { SCENARIOS, rerunFrom, runScenario, continueChat } from "./scripts/simulate";
+import { writeFileSync } from "node:fs";
 
 const PORT = Number(process.env.PORT ?? 8972);
 const ORIGIN = process.env.PUBLIC_ORIGIN ?? `http://localhost:${PORT}`;
@@ -31,39 +35,12 @@ async function handleChat(req: Request): Promise<Response> {
   const text = (body.message ?? "").trim();
   if (!text) return json({ error: "Empty message" }, 400);
   if (text.length > 4000) return json({ error: "Message too long" }, 400);
-
-  let chat = body.chatId ? getChat(body.chatId) : null;
-  if (!chat) chat = createChat({ model: MODEL, systemPrompt: buildSystemPrompt() });
-  addMessage(chat.id, "user", text);
-
-  const history: ChatMessage[] = [
-    { role: "system", content: chat.system_prompt },
-    ...getMessages(chat.id).map((m) => ({ role: m.role, content: m.content })),
-  ];
-
-  const chatId = chat.id;
-  const enc = new TextEncoder();
-  const sse = (event: string, data: unknown) => enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  const rs = new ReadableStream({
-    async start(ctrl) {
-      ctrl.enqueue(sse("meta", { chatId, model: MODEL }));
-      let full = "";
-      try {
-        for await (const delta of stream(MODEL, history)) {
-          full += delta;
-          ctrl.enqueue(sse("delta", delta));
-        }
-        addMessage(chatId, "assistant", full);
-        ctrl.enqueue(sse("done", { chatId }));
-      } catch (e) {
-        const msg = (e as Error).message;
-        if (full) addMessage(chatId, "assistant", full + "\n\n[reply cut off: " + msg + "]");
-        ctrl.enqueue(sse("error", { message: msg }));
-      }
-      ctrl.close();
-    },
-  });
-  return new Response(rs, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Chat-Id": chatId } });
+  try {
+    const t = await runTurn(body.chatId ?? null, text);
+    return json({ chatId: t.chatId, reply: t.reply, status: t.status, nodeIds: t.nodeIds, reader: READER() });
+  } catch (e) {
+    return json({ error: (e as Error).message }, 502);
+  }
 }
 
 Bun.serve({
@@ -79,12 +56,55 @@ Bun.serve({
     if (p === "/style.css") return new Response(Bun.file(PUBLIC + "style.css"), { headers: { "Content-Type": "text/css" } });
 
     if (p === "/api/chat" && req.method === "POST") return handleChat(req);
-    if (p === "/api/prompt") return new Response(buildSystemPrompt(), { headers: { "Content-Type": "text/plain;charset=utf-8" } });
+    if (p === "/admin") return page("admin.html");
+    if (p === "/api/tree/import" && req.method === "POST") {
+      const doc = await req.json().catch(() => null) as { nodes?: unknown[]; edges?: unknown[]; tree?: { rootNodeId?: string } } | null;
+      const v = validate(doc);
+      if (v.errors.length) return json({ error: v.errors.join("; "), warnings: v.warnings }, 400);
+      writeFileSync(activePath(), JSON.stringify(doc, null, 2));
+      const T = tree(); return json({ ok: true, source: treeSource(), report: T.report(), warnings: v.warnings, updatedAt: T.doc.tree.updatedAt });
+    }
+    if (p === "/api/admin/scenarios") return json(SCENARIOS.map((s) => ({ name: s.name, opener: s.opener })));
+    if (p === "/api/admin/new" && req.method === "POST") {
+      const b = await req.json().catch(() => ({})) as { scenario?: string; opener?: string; persona?: string };
+      const sc = SCENARIOS.find((s) => s.name === b.scenario) ?? (b.opener ? { name: "custom", opener: b.opener, persona: b.persona ?? "Answer plausibly and briefly." } : null);
+      if (!sc) return json({ error: "scenario or opener required" }, 400);
+      const log: string[] = [];
+      try { const id = await runScenario(sc, 8, (l) => log.push(l)); return json({ id, link: shareLink(id), log }); }
+      catch (e) { return json({ error: (e as Error).message, log }, 502); }
+    }
+    let m = p.match(/^\/api\/chats\/([A-Za-z0-9]+)\/rerun$/);
+    if (m && req.method === "POST") {
+      const b = await req.json().catch(() => ({})) as { seq?: number };
+      const log: string[] = [];
+      try { const id = await rerunFrom(m[1], Number(b.seq ?? 1), (l) => log.push(l)); return json({ id, link: shareLink(id), log }); }
+      catch (e) { return json({ error: (e as Error).message, log }, 502); }
+    }
+    if (p === "/api/tree") { const T = tree(); return json({ source: treeSource(), ...T.doc, report: T.report() }); }
+    if (p === "/api/admin/archive" && req.method === "POST") {
+      const b = await req.json().catch(() => ({})) as { keep?: number; id?: string; archived?: boolean };
+      if (b.id) { setArchived(b.id, b.archived !== false); return json({ ok: true }); }
+      return json(archiveAllBut(Number(b.keep ?? 3)));
+    }
+    if (p === "/api/admin/chats") {
+      const T = tree();
+      const includeArchived = url.searchParams.get("archived") === "1";
+      const chats = listChats({ sharedOnly: false, limit: 500, includeArchived }).map((c) => {
+        const msgs = getMessages(c.id);
+        return { id: c.id, title: c.title, scenario: c.scenario, source: c.source, status: c.status, created_at: c.created_at, message_count: msgs.length, archived: !!c.archived,
+          parent_id: c.parent_id, parent_seq: c.parent_seq, tree_updated_at: c.tree_updated_at,
+          state: (() => { try { return JSON.parse(c.state); } catch { return {}; } })(),
+          messages: msgs.map((m) => ({ seq: m.seq, role: m.role, content: m.content, node_ids: m.node_id ? m.node_id.split(",") : [], verbatim: m.verbatim, review: m.review ? JSON.parse(m.review) : null })) };
+      });
+      const visits: Record<string, number> = {};
+      for (const c of chats) for (const m of c.messages) for (const n of m.node_ids) visits[n] = (visits[n] ?? 0) + 1;
+      return json({ chats, visits, holes: T.doc.nodes.filter(isHole).map((n) => n.id) });
+    }
     if (p === "/api/chats" && req.method === "GET") {
       const all = url.searchParams.get("all") === "1";
       return json(listChats({ sharedOnly: !all }).map((c) => ({ ...c, system_prompt: undefined, link: shareLink(c.id) })));
     }
-    let m = p.match(/^\/api\/chats\/([A-Za-z0-9]+)\.txt$/);
+    m = p.match(/^\/api\/chats\/([A-Za-z0-9]+)\.txt$/);
     if (m) {
       const c = getChat(m[1]);
       if (!c) return json({ error: "Not found" }, 404);
@@ -105,4 +125,4 @@ Bun.serve({
   },
 });
 
-console.log(`chat helper on ${ORIGIN}  model ${MODEL}`);
+{ const T = tree(); const r = T.report(); console.log(`chat helper on ${ORIGIN}  tree ${treeSource()} (${r.nodes} squares, ${r.edges} arrows, ${r.holes.length} holes, ${r.unreachable.length} unreachable)  reader ${READER()}  translator ${MODEL}`); }
