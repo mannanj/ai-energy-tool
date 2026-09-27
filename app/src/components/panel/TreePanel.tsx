@@ -1,12 +1,11 @@
 "use client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTreeStore } from "@/lib/store";
-import { deriveTree, orderedNodes, toMarkdown } from "@/lib/derive";
+import { deriveTree, orderedNodes } from "@/lib/derive";
 import { NodeRow } from "./NodeRow";
 import { LinkPills } from "@/components/LinkPills";
 import { HistoryView } from "./HistoryView";
 import { ChatsView } from "./ChatsView";
-import { useChatStore } from "@/lib/chats";
 
 const ADD_PLACEHOLDER =
   "Add a square. Paste or type text and links here, for example a question, an answer, a phone number, or a source URL like https://www.dss.virginia.gov/relief/pipp/. Links become pills you can copy and share. Press Cmd/Ctrl+Enter to add.";
@@ -25,10 +24,7 @@ export function TreePanel({ popout = false }: Props) {
   const [filter, setFilter] = useState("");
   const [draft, setDraft] = useState("");
   const [attach, setAttach] = useState(true);
-  const [copiedAll, setCopiedAll] = useState(false);
   const view = useTreeStore((s) => s.panelView);
-  const setView = useTreeStore((s) => s.setPanelView);
-  const setInspect = useChatStore((s) => s.setInspect);
 
   const derived = useMemo(() => deriveTree(doc), [doc]);
   const list = useMemo(() => orderedNodes(derived, doc.tree.rootNodeId), [derived, doc.tree.rootNodeId]);
@@ -46,10 +42,6 @@ export function TreePanel({ popout = false }: Props) {
     }
     setDraft("");
   }, [draft, attach, addChild, addNode]);
-
-  const copyAll = async () => {
-    try { await navigator.clipboard.writeText(toMarkdown(list)); setCopiedAll(true); setTimeout(() => setCopiedAll(false), 1200); } catch {}
-  };
 
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
   const onResizeStart = (e: React.MouseEvent) => {
@@ -80,31 +72,22 @@ export function TreePanel({ popout = false }: Props) {
       )}
 
       <div className="flex items-center gap-1 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
-        <span className="truncate text-[13px] font-medium">{doc.tree.name}</span>
-        <span className="ml-1 text-[11px] text-neutral-500">{doc.nodes.length} squares</span>
-        <span className="ml-auto flex items-center gap-0.5">
-          <span className="mr-1 flex rounded border border-neutral-200 text-[11px] dark:border-neutral-700">
-            <button onClick={() => setView("tree")} className={`px-2 py-0.5 ${view === "tree" ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}>tree</button>
-            <button onClick={() => setView("history")} className={`px-2 py-0.5 ${view === "history" ? "bg-neutral-100 dark:bg-neutral-800" : ""}`} title="Version history">history</button>
-            <button onClick={() => { setView("chats"); setInspect(true); }} className={`px-2 py-0.5 ${view === "chats" ? "bg-neutral-100 dark:bg-neutral-800" : ""}`} title="Chats run against this tree">chats</button>
+        <span className="text-[13px] font-medium">{view === "chats" ? "Chats" : view === "history" ? "History" : "Squares"}</span>
+        {!popout && (
+          <span className="ml-auto flex items-center gap-0.5">
+            <button title={expanded ? "Restore width" : "Expand to full width"} onClick={() => setPanelExpanded(!expanded)} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+              {expanded ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              )}
+            </button>
+            <button title="Open in a new window" onClick={openPopout} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>
+            </button>
+            <button title="Close panel" onClick={() => setPanelOpen(false)} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">✕</button>
           </span>
-          <button title={copiedAll ? "Copied" : "Copy whole tree as text"} onClick={copyAll} className="rounded px-2 py-1 text-[11px] hover:bg-neutral-100 dark:hover:bg-neutral-800">{copiedAll ? "✓ copied" : "copy tree"}</button>
-          {!popout && (
-            <>
-              <button title={expanded ? "Restore width" : "Expand to full width"} onClick={() => setPanelExpanded(!expanded)} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
-                {expanded ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                )}
-              </button>
-              <button title="Open in a new window" onClick={openPopout} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>
-              </button>
-              <button title="Close panel" onClick={() => setPanelOpen(false)} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">✕</button>
-            </>
-          )}
-        </span>
+        )}
       </div>
 
       {view === "history" && <HistoryView />}

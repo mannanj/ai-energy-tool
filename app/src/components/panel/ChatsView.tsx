@@ -18,6 +18,7 @@ export function ChatsView() {
   const { load, select, showAll, rerun, runScenario, setShowArchived, archive } = useChatStore.getState();
   const [picked, setScenario] = useState("");
   const scenario = picked || scenarios[0]?.name || "";
+  const opener = scenarios.find((x) => x.name === scenario)?.opener ?? "";
   useEffect(() => { load(); }, [load]);
   const c: Chat | undefined = chats.find((x) => x.id === current);
 
@@ -60,12 +61,14 @@ export function ChatsView() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
-        <div className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">New chat</div>
-        <div className="flex gap-2">
-          <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="min-w-0 flex-1 rounded border border-neutral-200 bg-white px-2 py-1 text-[12px] dark:border-neutral-700 dark:bg-neutral-900">
-            {scenarios.map((s) => <option key={s.name} value={s.name}>{s.name} — {s.opener.slice(0, 50)}</option>)}
+        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/60">
+          <div className="text-[13px] font-medium">New chat</div>
+          <label className="mt-2 block text-[11px] text-neutral-500">Resident</label>
+          <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="mt-0.5 w-full rounded border border-neutral-200 bg-white px-2 py-1 text-[12px] dark:border-neutral-700 dark:bg-neutral-900">
+            {scenarios.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
           </select>
-          <button type="button" disabled={!!busy || !scenario} onClick={() => runScenario(scenario)} title="Run this scenario against the current tree" className="rounded bg-emerald-700 px-3 py-1 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">+ Run</button>
+          {opener && <div className="mt-2 rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"><span className="text-neutral-500">First message: </span>{opener}</div>}
+          <button type="button" disabled={!!busy || !scenario} onClick={() => runScenario(scenario)} className="mt-2 w-full rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Running…" : "Start chat"}</button>
         </div>
       </div>
       <div className="flex items-center gap-2 px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">
