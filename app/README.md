@@ -61,6 +61,20 @@ bunx wrangler d1 migrations apply ai-energy-tool --remote   # only when migratio
 | `Esc` | leave the text field |
 | `Delete` / `Backspace` | delete selected square or arrow |
 
+## Version history
+
+Open the right panel and switch to **history**. Every version lists time, label, author, and square/arrow counts,
+with a **restore** button. Restoring saves a "before restore" checkpoint first, so nothing is ever lost.
+
+- Automatic snapshots are taken while the tree changes, at most once a minute, and skipped when nothing changed.
+- "Save checkpoint" stores a named version on request.
+- "New empty canvas" and "Load example tree" save a checkpoint before they replace the tree.
+- Versions live in the same Durable Object SQLite as the tree (`versions` table). The newest 500 automatic
+  snapshots are kept; named checkpoints are never pruned.
+
+API, with a session cookie: `GET /api/tree/main/versions`, `GET /api/tree/main/versions/:n`,
+`POST /api/tree/main/versions {label}`, `POST /api/tree/main/versions/:n/restore`.
+
 ## Backend access
 
 `GET /api/tree/main/export` (with a session cookie) returns the current tree as JSON:

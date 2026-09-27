@@ -6,7 +6,7 @@
  *  /parties/tree-room/:id   WebSocket (needs session cookie)
  *  everything else     needs gate + session, then served from assets
  */
-import { routePartykitRequest } from "partyserver";
+import { getServerByName, routePartykitRequest } from "partyserver";
 import type { Env } from "./env";
 import { clearCookie, consumeLoginToken, createLoginToken, gateCookie, getSession, hasGate, passwordMatches, sessionCookie, upsertUser, SESSION_COOKIE, GATE_COOKIE } from "./auth";
 import { sendMagicLink } from "./email";
@@ -82,11 +82,14 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
     return json({ ok: true }, { headers });
   }
 
-  const m = /^\/api\/tree\/([\w-]+)\/export$/.exec(path);
-  if (m && req.method === "GET") {
-    if (!(await getSession(req, env))) return json({ error: "session" }, { status: 401 });
-    const stub = env.TreeRoom.get(env.TreeRoom.idFromName(m[1]));
-    return stub.fetch(new Request(`https://room/parties/tree-room/${m[1]}`));
+  // /api/tree/:id/(export|versions|versions/:n|versions/:n/restore) → the room's HTTP handler
+  const m = /^\/api\/tree\/([\w-]+)\/(export|versions(?:\/\d+(?:\/restore)?)?)$/.exec(path);
+  if (m) {
+    const s = await getSession(req, env);
+    if (!s) return json({ error: "session" }, { status: 401 });
+    const stub = await getServerByName(env.TreeRoom as unknown as Parameters<typeof getServerByName>[0], m[1]);
+    const headers = new Headers({ "Content-Type": "application/json", "x-aet-user": `${s.firstName} ${s.lastName}`.trim() });
+    return stub.fetch(new Request(`https://room/parties/tree-room/${m[1]}/${m[2]}`, { method: req.method, headers, body: req.method === "POST" ? await req.text() : undefined }));
   }
 
   return json({ error: "not found" }, { status: 404 });

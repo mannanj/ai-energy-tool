@@ -2,6 +2,7 @@
 import { Panel, useReactFlow } from "@xyflow/react";
 import { useTreeStore } from "@/lib/store";
 import { NODE_H, NODE_W } from "@/lib/seed";
+import { saveCheckpoint } from "@/lib/versions";
 
 function Btn({ title, onClick, children, disabled }: { title: string; onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
@@ -56,10 +57,10 @@ export function Toolbar() {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
         </Btn>
         <div className="my-0.5 h-px bg-neutral-200 dark:bg-neutral-700" />
-        <Btn title="Load example tree (Fairfax / Dominion)" onClick={() => { if (confirm("Replace the canvas with the example tree?")) { loadExample(); setTimeout(() => rf.fitView({ padding: 0.2 }), 50); } }}>
+        <Btn title="Load example tree (Fairfax / Dominion)" onClick={async () => { if (confirm("Replace the canvas with the example tree for everyone? A checkpoint is saved first.")) { await saveCheckpoint("before example load"); loadExample(); setTimeout(() => rf.fitView({ padding: 0.2 }), 50); } }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v4M5 21v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><rect x="8" y="7" width="8" height="6" rx="1"/></svg>
         </Btn>
-        <Btn title="New empty canvas" onClick={() => { if (confirm("Clear the canvas? This cannot be undone.")) { resetEmpty(); setTimeout(() => rf.fitView({ padding: 0.5 }), 50); } }}>
+        <Btn title="New empty canvas" onClick={async () => { if (confirm("Clear the canvas for everyone? A checkpoint is saved first, so it can be restored from the panel's history.")) { await saveCheckpoint("before new canvas"); resetEmpty(); setTimeout(() => rf.fitView({ padding: 0.5 }), 50); } }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
         </Btn>
       </div>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saved chats</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Saved chats</h1><div class="sub">Shared conversations on this server. Simulated ones are labeled with their scenario.</div></div>
+    <div class="spacer"></div>
+    <nav><a href="/">New chat</a><a href="/chats?all=1">Show unshared too</a></nav>
+  </header>
+  <main><ul class="list" id="list"></ul><p class="footnote" id="foot"></p></main>
+</div>
+<script>
+(async () => {
+  const all = new URLSearchParams(location.search).get("all") === "1";
+  const r = await fetch("/api/chats" + (all ? "?all=1" : ""));
+  const chats = await r.json();
+  const ul = document.getElementById("list");
+  for (const c of chats) {
+    const li = document.createElement("li");
+    const a = document.createElement("a"); a.href = "/c/" + c.id; a.className = "t"; a.textContent = c.title || "(untitled)";
+    const m = document.createElement("div"); m.className = "m";
+    m.textContent = [c.scenario ? "scenario: " + c.scenario : c.source, c.message_count + " messages", new Date(c.updated_at).toLocaleString(), c.shared_at ? "shared" : "not shared"].join(" · ");
+    li.append(a, m); ul.append(li);
+  }
+  document.getElementById("foot").textContent = chats.length ? chats.length + " chats" : "No chats yet. Start one, then press Share.";
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "ai-energy-chat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch server.ts",
+    "start": "bun server.ts",
+    "simulate": "bun scripts/simulate.ts",
+    "export": "bun scripts/export.ts"
+  },
+  "devDependencies": { "@types/bun": "^1.2.0" }
+}

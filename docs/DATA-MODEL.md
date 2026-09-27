@@ -13,6 +13,8 @@ Source of truth is `app/src/types/tree.ts`. Summary:
 
 \* written later, by the multiplayer build.
 
+| `Version` | n, createdAt, label, author, nodeCount, edgeCount, data (TreeDocument JSON) | `versions` table in the room's SQLite. Auto snapshots at most once a minute, named checkpoints, restore rewrites the live Yjs maps. |
+
 ## Derived at read time, never stored
 
 | Type | How |

@@ -9,3 +9,4 @@ context/sources/_capture-tooling/node_modules/
 .dev.vars
 .wrangler/
 out/
+chat/data/*.sqlite*
