@@ -68,7 +68,7 @@ export function TreeCanvas() {
       const nth = new Map<number, number>(); const cnt = { user: 0, assistant: 0 }; for (const m of c.messages) nth.set(m.seq, ++cnt[m.role]);
       for (const m of c.messages) {
         if (m.role === "user") { pendingUser = m; continue; }
-        const sid = m.node_ids.find((x) => sq.has(x)); if (!sid) { pendingUser = null; continue; }
+        const sid = m.node_ids.find((x) => sq.has(x)) ?? (m.node_ids.length ? doc.tree.rootNodeId : null); if (!sid || !sq.has(sid)) { pendingUser = null; continue; }
         const n = sq.get(sid)!; const k = (used[sid] = (used[sid] ?? 0) + 1);
         const base = { x: n.x * spread, y: n.y };
         const at = (seq: number, dx: number, dy: number) => { const saved = bubblePos[`${cid}:${seq}`]; return saved ? { x: base.x + saved.x, y: base.y + saved.y } : { x: base.x + dx, y: base.y + dy }; };
@@ -88,7 +88,7 @@ export function TreeCanvas() {
       }
     });
     return { nodesOut, edgesOut };
-  }, [inspectOn, chats, shown, doc.nodes, bubblePos, spread, hover]);
+  }, [inspectOn, chats, shown, doc.nodes, doc.tree.rootNodeId, bubblePos, spread, hover]);
   const squareOf = useCallback((bubbleKey: string) => {
     const [cid, seqS] = bubbleKey.split(":"); const seq = Number(seqS);
     const msgs = chats.find((c) => c.id === cid)?.messages ?? [];
