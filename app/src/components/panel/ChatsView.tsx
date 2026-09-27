@@ -3,14 +3,20 @@ import { useEffect, useState } from "react";
 import { CHAT_ORIGIN, chatColor, chatLabel, useChatStore, type Chat } from "@/lib/chats";
 import { Rich } from "@/components/nodes/BubbleNode";
 
-const Avatar = ({ role }: { role: "user" | "assistant" }) => role === "user" ? (
+const Avatar = ({ role, n }: { role: "user" | "assistant"; n: number }) => role === "user" ? (
+  <>
   <span title="Resident" className="absolute -left-[34px] top-1.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#4a86e8] text-white">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
   </span>
+  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center text-[10px] font-semibold leading-none text-[#4a86e8]">#{n}</span>
+  </>
 ) : (
+  <>
   <span title="Helper" className="absolute -left-[34px] top-1.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#e8842a] text-white">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h6"/></svg>
   </span>
+  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center text-[10px] font-semibold leading-none text-[#e8842a]">#{n}</span>
+  </>
 );
 
 export function ChatsView() {
@@ -49,10 +55,11 @@ export function ChatsView() {
           {c.source}{c.scenario && <> · <b>{c.scenario}</b></>} · {c.status}{c.state.ended_reason && ` (${c.state.ended_reason})`}{c.parent_id && <> · rerun of <a href="#" className="underline" onClick={(e) => { e.preventDefault(); select(c.parent_id!, true); }}>{c.parent_id}</a> from #{c.parent_seq}</>} · <a className="underline" href={`${CHAT_ORIGIN}/c/${c.id}`} target="_blank" rel="noopener">open</a> · <a href="#" className="underline" onClick={(e) => { e.preventDefault(); archive(c.id, !c.archived); }}>{c.archived ? "unarchive" : "archive"}</a>
         </div>
         <div className="flex flex-col gap-2 px-3 pb-6">
-          {c.messages.map((m) => {
+          {c.messages.map((m, i) => {
+            const n = c.messages.slice(0, i + 1).filter((x) => x.role === m.role).length;
             return (
               <div key={m.seq} onMouseEnter={() => setHover({ chatId: c.id, seq: m.seq })} onMouseLeave={() => setHover(null)} onClick={() => jumpTo(c.id, m.seq)} style={{ transform: hover && hover.chatId === c.id && hover.seq === m.seq ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`relative ml-[34px] cursor-pointer rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${hover && hover.chatId === c.id && hover.seq === m.seq ? "ring-2 ring-sky-400/50" : ""} ${m.role === "user" ? "rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.10)]" : "rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.10)]"}`}>
-                <Avatar role={m.role} />
+                <Avatar role={m.role} n={n} />
                 <Rich text={m.content} />
                 {m.role === "assistant" && m.trace && (
                   <div className="mt-1.5 rounded bg-black/5 px-2 py-1 font-mono text-[10px] leading-relaxed text-neutral-600 dark:bg-white/5 dark:text-neutral-300">

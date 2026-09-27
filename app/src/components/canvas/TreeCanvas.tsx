@@ -65,6 +65,7 @@ export function TreeCanvas() {
       const c = chats.find((x) => x.id === cid); if (!c) return;
       const color = chatColor(shown, cid); const used: Record<string, number> = {};
       let prev: string | null = null; let pendingUser: typeof c.messages[number] | null = null; let first = true;
+      const nth = new Map<number, number>(); const cnt = { user: 0, assistant: 0 }; for (const m of c.messages) nth.set(m.seq, ++cnt[m.role]);
       for (const m of c.messages) {
         if (m.role === "user") { pendingUser = m; continue; }
         const sid = m.node_ids.find((x) => sq.has(x)); if (!sid) { pendingUser = null; continue; }
@@ -75,7 +76,7 @@ export function TreeCanvas() {
         const push = (msg: typeof m, pos: { x: number; y: number }) => {
           const id = `b:${cid}:${msg.seq}`;
           nodesOut.push({ id, type: "bubble", draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 5, position: pos,
-            data: { chatId: cid, seq: msg.seq, role: msg.role, color, text: msg.content, nodeIds: msg.node_ids, review: msg.review, label: first && shown.length > 1 ? chatLabel(c) + " · " + cid : null, hot: !!hover && hover.chatId === cid && (hover.seq == null || hover.seq === msg.seq) } });
+            data: { chatId: cid, seq: msg.seq, role: msg.role, color, text: msg.content, nodeIds: msg.node_ids, review: msg.review, label: first && shown.length > 1 ? chatLabel(c) + " · " + cid : null, hot: !!hover && hover.chatId === cid && (hover.seq == null || hover.seq === msg.seq), n: nth.get(msg.seq) ?? 0 } });
           first = false;
           if (prev) edgesOut.push({ id: `t:${prev}:${id}`, source: prev, target: id, type: "thread", selectable: false, deletable: false, focusable: false, data: { color } });
           if (msg.role === "assistant") edgesOut.push({ id: `a:${id}`, source: id, sourceHandle: "anchor", target: sid, targetHandle: "anchor", type: "anchor", selectable: false, deletable: false, focusable: false, zIndex: 4 });
