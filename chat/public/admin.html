@@ -71,19 +71,19 @@
   .sq .step { position: absolute; top: -10px; left: -10px; background: #1f5f3f; color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 7px; font-weight: 600; }
   .sq .idtag { position: absolute; bottom: 2px; right: 6px; font-size: 9px; color: var(--muted); }
   .edge-label { font-size: 11px; fill: #444; }
-  .callout { position: absolute; width: 300px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--c, var(--accent)); border-radius: 10px; padding: 6px 8px; font-size: 11px; line-height: 1.35; box-shadow: 0 2px 10px #0003; z-index: 3; }
-  .callout::before { content: ""; position: absolute; left: -9px; top: 12px; border: 5px solid transparent; border-right-color: var(--c, var(--accent)); }
-  .callout .tag { position: absolute; top: -9px; left: 8px; background: var(--c, var(--accent)); color: #fff; font-size: 9px; padding: 0 6px; border-radius: 999px; }
+  .callout { position: absolute; width: 300px; box-sizing: border-box; font-size: 11px; line-height: 1.35; z-index: 3; display: flex; flex-direction: column; gap: 4px; }
+  .callout .r, .callout .h { max-width: 92%; padding: 6px 9px; border-radius: 14px; box-shadow: 0 1px 4px #0002; }
+  .callout .r { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
+  .callout .h { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c, var(--accent)); border-bottom-left-radius: 4px; max-height: 5.2em; overflow: hidden; }
+  .callout.open .h { max-height: none; }
+  .callout .k { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .callout .row { display: flex; gap: 6px; align-items: center; padding-left: 4px; }
+  .callout .row button { padding: 1px 7px; font-size: 10px; }
+  .callout .pill { font-size: 10px; padding: 0 6px; }
+  .callout .tag { font-size: 9px; color: var(--c, var(--accent)); font-weight: 600; padding-left: 4px; }
   .tabs { display: flex; gap: 4px; padding: 6px 10px 0 110px; flex-wrap: wrap; }
   .tabs button { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
   .tabs button.on { border-color: var(--c); color: var(--c); font-weight: 600; }
-  .callout .r { background: var(--user); border-radius: 6px; padding: 4px 6px; margin-bottom: 4px; }
-  .callout .h { padding: 2px 0; max-height: 3.9em; overflow: hidden; }
-  .callout.open .h { max-height: none; }
-  .callout .k { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  .callout .row { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
-  .callout .row button { padding: 1px 7px; font-size: 10px; }
-  .callout .pill { font-size: 10px; padding: 0 6px; }
   body.nocallouts .callout { display: none; }
   .busy { position: fixed; bottom: 14px; right: 14px; z-index: 9; background: #1f5f3f; color: #fff; padding: 8px 14px; border-radius: 10px; font-size: 13px; display: none; }
   .busy.show { display: block; }
@@ -107,7 +107,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/><path d="M9 6h12M9 12h12M9 18h12"/></svg>
       <span class="count" id="chatCount"></span>
     </button>
-    <div class="canvas" id="canvas"><div class="world" id="world"><svg id="edges"></svg></div></div>
+    <div class="canvas" id="canvas"><div class="world" id="world"><svg id="edges"></svg><svg id="threads"></svg></div></div>
   </div>
   <aside class="panel hidden" id="panel">
     <div class="grip" id="grip"></div>
@@ -238,8 +238,24 @@
   $("#showArchived").onchange = () => load();
   function drawCallouts() {
     world.querySelectorAll(".callout").forEach((e) => e.remove());
+    $("#threads").innerHTML = "";
     if (POP) return;
     shown.forEach((cid, col) => { const c = data.chats.find((x) => x.id === cid); if (c) drawChatCallouts(c, col); });
+    drawThreads();
+  }
+  /** A line in the chat's colour from each bubble to the next one of the same chat. */
+  function drawThreads() {
+    let s = "";
+    for (const cid of shown) {
+      const els = [...world.querySelectorAll(`.callout[data-chat="${cid}"]`)];
+      for (let i = 0; i + 1 < els.length; i++) {
+        const a = els[i], b = els[i + 1];
+        const x1 = a.offsetLeft + 24, y1 = a.offsetTop + a.offsetHeight, x2 = b.offsetLeft + 24, y2 = b.offsetTop;
+        const my = (y1 + y2) / 2;
+        s += `<path d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" fill="none" stroke="${colorOf(cid)}" stroke-width="1.5" stroke-dasharray="4 3" opacity=".8"/>`;
+      }
+    }
+    $("#threads").innerHTML = s;
   }
   function drawChatCallouts(c, col) {
     const used = {};
@@ -248,14 +264,14 @@
       if (m.role === "user") { lastUser = m; continue; }
       const id = m.node_ids.find((x) => byId[x]); if (!id) continue;
       const n = byId[id]; const k = used[id] = (used[id] || 0) + 1;
-      const d = document.createElement("div"); d.className = "callout"; d.style.setProperty("--c", colorOf(c.id));
+      const d = document.createElement("div"); d.className = "callout"; d.dataset.chat = c.id; d.style.setProperty("--c", colorOf(c.id));
       d.style.left = (n.x + (n.width || 240) + 14 + col * 314) + "px"; d.style.top = (n.y + (k - 1) * 30) + "px";
-      const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = (c.parent_id ? "rerun " : "") + c.id; d.append(tag);
-      const r = document.createElement("div"); r.className = "r"; r.innerHTML = `<div class="k">Resident</div>${esc(lastUser ? lastUser.content : "")}`; d.append(r);
-      const h = document.createElement("div"); h.className = "h"; h.innerHTML = `<div class="k">Helper · square ${esc(m.node_ids.join(", "))}</div>${render(m.content)}`; d.append(h);
+      const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = (c.parent_id ? "rerun " : "") + c.id; if (shown.length > 1) d.append(tag);
+      const r = document.createElement("div"); r.className = "r"; r.textContent = lastUser ? lastUser.content : ""; if (lastUser) d.append(r);
+      const h = document.createElement("div"); h.className = "h"; h.innerHTML = render(m.content); h.title = "square " + m.node_ids.join(", "); d.append(h);
       const row = document.createElement("div"); row.className = "row";
       if (m.review) { const p = document.createElement("span"); p.className = "pill " + (m.review.used === "written" ? "ok" : "bad"); p.textContent = m.review.used; p.title = m.review.reason || `covers ${fmt(m.review.covers)} adds-nothing ${fmt(m.review.adds_nothing)} asks-same ${fmt(m.review.tone)}`; row.append(p); }
-      const more = document.createElement("button"); more.type = "button"; more.textContent = "more"; more.onclick = (e) => { e.stopPropagation(); d.classList.toggle("open"); more.textContent = d.classList.contains("open") ? "less" : "more"; }; row.append(more);
+      const more = document.createElement("button"); more.type = "button"; more.textContent = "more"; more.onclick = (e) => { e.stopPropagation(); d.classList.toggle("open"); more.textContent = d.classList.contains("open") ? "less" : "more"; drawThreads(); }; row.append(more);
       const rr = document.createElement("button"); rr.type = "button"; rr.textContent = "↻ rerun from here"; rr.onclick = (e) => { e.stopPropagation(); rerun(c.id, m.seq); }; row.append(rr);
       d.append(row);
       d.addEventListener("mousedown", (e) => e.stopPropagation());
