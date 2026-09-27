@@ -28,6 +28,14 @@ replies, every chat saved in full to a local SQLite file, share links at `/c/:id
 `python3 scripts/audit.py` checks that every phone number and link the helper said exists in the tree.
 See `chat/README.md`.
 
+Update 2026-09-27 (late): one app. The chat is a plugin inside the tree editor: toolbar toggle, chats tab,
+bubbles on the canvas beside their squares (resident blue, helper orange, lines between), reruns as
+parallel columns, positions shared in the tree document. The chat server reads the live tree from the
+local Worker before every turn. The writer now always paraphrases (3 reviewed attempts + a Jev filler
+stage with a plain-language rewrite); drafts are kept in the database, the UI shows only what the resident
+saw. System prompt: empathy and filler lines removed. Everything runs locally (wrangler dev 8971, next dev
+3010, chat 8972); nothing redeployed. Three gold chats regenerated on the live tree; all older chats archived.
+
 Update 2026-09-27 (night): tests in place (`bun test` 23 unit, `bun scripts/mutate.ts` 20/20 mutants
 killed, `bun scripts/e2e.ts` 15 checks with real Jev + DeepSeek, all passing). The e2e run caught and
 fixed one bug: importing a tree wrote to the wrong file when the server ran on an override path.

@@ -4,7 +4,8 @@
  * (partyserver). Zustand mirrors the Yjs maps into plain arrays for React, and every mutation
  * writes back into Yjs. Awareness carries presence: user, cursor, and which square they are typing in.
  *
- * Yjs maps: meta {id,name,rootNodeId,...}, nodes {id -> TreeNode}, edges {id -> TreeEdge}, locks {nodeId -> NodeLock}
+ * Yjs maps: meta {id,name,rootNodeId,...}, nodes {id -> TreeNode}, edges {id -> TreeEdge}, locks {nodeId -> NodeLock},
+ * bubbles {"chatId:seq" -> {x,y}}: where a chat bubble was dragged to on the canvas (the chat plugin; chats themselves live in the chat server)
  */
 import { create } from "zustand";
 import * as Y from "yjs";
@@ -30,6 +31,8 @@ interface State {
   me: Me | null;
   peers: Peer[];
   locks: Record<NodeId, NodeLock>;
+  /** chat bubble positions on the canvas, shared like squares */
+  bubblePos: Record<string, { x: number; y: number }>;
   /** ticks every 10s so lock expiry re-renders */
   now: number;
 
@@ -39,6 +42,7 @@ interface State {
   panelOpen: boolean;
   panelWidth: number;
   panelExpanded: boolean;
+  panelView: "tree" | "history" | "chats";
 
   connect: (me: Me) => () => void;
   resetEmpty: () => void;
@@ -58,12 +62,14 @@ interface State {
   touchLock: (nodeId: NodeId) => void;
   releaseLock: (nodeId: NodeId) => void;
   setCursor: (pos: { x: number; y: number } | null) => void;
+  moveBubble: (key: string, x: number, y: number) => void;
 
   select: (nodeId: NodeId | null, edgeId?: EdgeId | null) => void;
   clearFocus: () => void;
   setPanelOpen: (v: boolean) => void;
   setPanelWidth: (px: number) => void;
   setPanelExpanded: (v: boolean) => void;
+  setPanelView: (v: "tree" | "history" | "chats") => void;
 }
 
 const now = () => new Date().toISOString();
@@ -75,7 +81,7 @@ let provider: YProvider | null = null;
 let awareness: Awareness | null = null;
 const maps = () => {
   if (!ydoc) throw new Error("not connected");
-  return { meta: ydoc.getMap<unknown>("meta"), nodes: ydoc.getMap<TreeNode>("nodes"), edges: ydoc.getMap<TreeEdge>("edges"), locks: ydoc.getMap<NodeLock>("locks") };
+  return { meta: ydoc.getMap<unknown>("meta"), nodes: ydoc.getMap<TreeNode>("nodes"), edges: ydoc.getMap<TreeEdge>("edges"), locks: ydoc.getMap<NodeLock>("locks"), bubbles: ydoc.getMap<{ x: number; y: number }>("bubbles") };
 };
 
 /** A lock counts only while fresh. */
@@ -94,7 +100,8 @@ export const useTreeStore = create<State>((set, get) => {
     };
   };
   const readLocks = () => Object.fromEntries(maps().locks.entries()) as Record<NodeId, NodeLock>;
-  const refresh = () => set({ doc: readDoc(), locks: readLocks() });
+  const readBubbles = () => Object.fromEntries(maps().bubbles.entries());
+  const refresh = () => set({ doc: readDoc(), locks: readLocks(), bubblePos: readBubbles() });
   const tx = (fn: () => void) => { ydoc!.transact(fn, "local"); maps().meta.set("updatedAt", now()); };
   const meId = () => get().me?.id;
   const patchNode = (id: NodeId, patch: Partial<TreeNode>) => {
@@ -115,6 +122,7 @@ export const useTreeStore = create<State>((set, get) => {
     me: null,
     peers: [],
     locks: {},
+    bubblePos: {},
     now: Date.now(),
     selectedNodeId: null,
     selectedEdgeId: null,
@@ -122,6 +130,7 @@ export const useTreeStore = create<State>((set, get) => {
     panelOpen: false,
     panelWidth: 420,
     panelExpanded: false,
+    panelView: "tree",
 
     connect: (me) => {
       if (provider) provider.destroy();
@@ -131,9 +140,9 @@ export const useTreeStore = create<State>((set, get) => {
       provider = new YProvider(partyHost(), TREE_ID, ydoc, { party: "tree-room", awareness });
       set({ me });
 
-      const { nodes, edges, meta, locks } = maps();
+      const { nodes, edges, meta, locks, bubbles } = maps();
       const onChange = () => refresh();
-      nodes.observe(onChange); edges.observe(onChange); meta.observe(onChange); locks.observe(onChange);
+      nodes.observe(onChange); edges.observe(onChange); meta.observe(onChange); locks.observe(onChange); bubbles.observe(onChange);
       provider.on("sync", (synced: boolean) => { if (synced) { refresh(); set({ hydrated: true }); } });
       provider.on("status", (e: { status: string }) => set({ connected: e.status === "connected" }));
 
@@ -272,12 +281,14 @@ export const useTreeStore = create<State>((set, get) => {
       setLocalAwareness({ editingNodeId: null });
     },
     setCursor: (pos) => setLocalAwareness({ cursor: pos }),
+    moveBubble: (key, x, y) => { if (!ydoc) return; ydoc.transact(() => maps().bubbles.set(key, { x: Math.round(x), y: Math.round(y) }), "local"); },
 
     select: (nodeId, edgeId = null) => set({ selectedNodeId: nodeId, selectedEdgeId: edgeId }),
     clearFocus: () => set({ focusNodeId: null }),
     setPanelOpen: (v) => set({ panelOpen: v }),
     setPanelWidth: (px) => set({ panelWidth: Math.max(280, px) }),
     setPanelExpanded: (v) => set({ panelExpanded: v }),
+    setPanelView: (v) => set({ panelView: v }),
   };
 });
 

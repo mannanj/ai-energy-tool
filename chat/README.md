@@ -1,8 +1,15 @@
-# Chat stage: the resident-facing helper
+# Chat stage: the resident-facing helper, and the chat plugin for the tree editor
 
-A plain chat page where **the editor's tree is the backend**. The squares and arrows drawn in the team
-editor (`app/`, deployed as the Worker) are the only data. Code walks that graph; models only read, phrase,
-and review.
+**One app, one tree.** The team edits the tree in the editor (`app/`). This folder is the chat server behind it:
+it walks that same tree document, saves every chat in SQLite, and serves the editor's **chats** tab and the
+bubbles drawn on the editor's canvas. There is no separate chat UI to maintain; `/` and `/c/:id` here are the
+resident-facing chat page and share links.
+
+**Where the tree comes from.** When `WORKER_ORIGIN` is set (local: `http://localhost:8971`, wrangler dev), the
+server reads the live tree from the Worker's export route before every turn, signing a short-lived session
+cookie with the Worker's `SESSION_SECRET` (taken from `app/.dev.vars` if not set). Otherwise it reads
+`data/tree.json` or the seed. So an edit in the editor is in the next reply, and "rerun from here" always uses
+the current tree.
 
 How a turn works (`lib/turn.ts`):
 
@@ -14,28 +21,25 @@ How a turn works (`lib/turn.ts`):
    A square with none is an answer and ends the chat. "Either" or unlabeled arrows ride along. An empty
    square is a **hole**: the helper says the 2-1-1 line instead. An off-topic first message is declined
    in one reply and the chat closes.
-3. **DeepSeek writes** the reply in the helper's voice from the square's text with the conversation as
-   context (`lib/writer.ts`), then **Jev reviews** it: does it cover every point, add nothing, and ask
-   exactly what the square asks? A code check first rejects any number or link not in the square (numbers
-   the resident said are allowed). If either fails, the square's verbatim text is sent. The review is
-   stored on the message and shown in the inspector.
+3. **DeepSeek always paraphrases** the square in plain, direct language (`lib/writer.ts`), with the whole
+   conversation as context and the team's own labels ("Step 0", "Branch A") dropped. A code check rejects
+   any number or link that is neither in the square nor already in the conversation. **Jev reviews** the
+   wording: covers every point, adds nothing, asks exactly what the square asks, no filler. Up to three
+   attempts, each told what the last one got wrong; then a **filler stage**: if Jev still smells filler, a
+   follow-on call rewrites it plainly. The final text is what the resident sees and what later turns get
+   as context. Every draft and its scores stay on the message in the database (`drafts`), never in the UI.
+   Raw square text goes out only if every attempt invented a number or link.
 
-The tree file is `data/tree.json` (export of the live editor: sign in to the editor site and open
-`/api/tree/main/export`, then Import in the inspector) or `data/tree.seed.json` (the seed) when absent.
-It is re-read whenever the file changes.
+## The chat plugin in the editor (`app/`)
 
-## Inspector
-
-`/admin` is the tree, read-only, with chats drawn on it. Every reply a chat produced appears as a bubble
-beside the square it came from: the resident's message that led there, the helper's reply, the Jev review
-(written or verbatim), and **↻ rerun from here**. In list mode every listed chat is on the canvas, one
-column per chat. Pick a chat and only it is shown; its path gets step numbers. A rerun replays the
-resident's messages up to that reply through the *current* tree, lets the simulated resident finish, and
-appears as a second column beside the original, saved as a new chat linked to its parent. The panel on
-the right (toggle with the icon top right, resize, expand, pop out) lists chats and shows the selected
-transcript with a back link. **+ Run** starts a scenario against the current tree. **Import tree…** takes
-the editor's export JSON. Archived chats leave the lists but keep their links; `bun scripts/archive.ts
---keep 3` archives everything else, and the "archived" checkbox shows them again.
+The speech-bubble button in the editor's toolbar turns the plugin on. Every message of each chat on the
+canvas is a bubble beside the square the reply came from: resident (blue) then helper (orange), joined by a
+line in the chat's colour, chat to chat in separate columns. In chat mode the tree spreads out horizontally
+so the columns fit. Bubbles drag like squares; their offset from their square is saved in the shared tree
+document (Yjs map `bubbles`), so everyone sees the same layout and bubbles follow their square. The panel's
+**chats** tab lists chats, shows one (only what the resident saw), runs a scenario against the current tree,
+and **↻ rerun from here** replays a chat up to that reply through the current tree as a new column. Chats
+themselves stay in this server's SQLite; the editor reads them over CORS from `NEXT_PUBLIC_CHAT_ORIGIN`.
 
 ## Tests
 
@@ -43,7 +47,7 @@ the editor's export JSON. Archived chats leave the lists but keep their links; `
 |---|---|
 | `bun test` | unit tests: tree semantics, the code check, the walker with a scripted reader (no network) |
 | `bun scripts/mutate.ts` | mutation testing: 20 one-line bugs in `lib/`, all must be caught by `bun test` |
-| `bun scripts/e2e.ts` | end to end on a scratch port and database with real Jev and DeepSeek: decline, urgent, answer, hole, ended chat, inspector API, import, rerun, the inspector page in a headless browser |
+| `bun scripts/e2e.ts` | end to end on a scratch port and database with real Jev and DeepSeek: decline, urgent, answer, hole, ended chat, plugin API, import, rerun |
 | `python3 scripts/audit.py` | every number and link in every saved reply exists in the tree; wording stats |
 
 ## Run
@@ -76,12 +80,11 @@ works before pressing Share; Share just lists it on `/chats`. Links point at `PU
 | `lib/turn.ts` | one resident message in, one reply out; walks the tree; used by the server and the simulator |
 | `lib/judge.ts` | Jev reader (TypeSafe System One), DeepSeek JSON fallback, translator |
 | `lib/writer.ts` | DeepSeek wording of a square + code check + Jev review |
-| `public/admin.html` | the inspector |
 | `lib/llm.ts` | OpenRouter client: `complete()` and streaming `stream()` |
 | `lib/db.ts` | `bun:sqlite` store, tables `chats` and `messages`; file at `data/chats.sqlite` (gitignored) |
 | `scripts/simulate.ts` | scenarios; `runScenario`, `continueChat`, `rerunFrom` used by the inspector |
 | `data/samples/*.md` | transcripts of the last simulation run plus `README.md` with the share links |
-| `.env` | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `SIM_MODEL`, `TYPESAFE_API_KEY`, `TYPESAFE_MODEL`, `PORT`, `PUBLIC_ORIGIN`, `DB_PATH` |
+| `.env` | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `SIM_MODEL`, `TYPESAFE_API_KEY`, `TYPESAFE_MODEL`, `WORKER_ORIGIN`, `CHAT_CORS_ORIGIN`, `PORT`, `PUBLIC_ORIGIN`, `DB_PATH` |
 
 Model: `deepseek/deepseek-v4-flash`, about $0.05 per million input tokens. The tree is ~22k characters,
 so one full conversation costs well under a cent.

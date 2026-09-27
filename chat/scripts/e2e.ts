@@ -1,7 +1,7 @@
 /**
  * End-to-end against a live server with real Jev + DeepSeek: boots server.ts on a scratch port and DB,
- * imports a small tree with a hole and a No arrow, runs chats over HTTP, checks the inspector API,
- * rerun, and the admin page in a headless browser. Run: bun scripts/e2e.ts
+ * imports a small tree with a hole and a No arrow, runs chats over HTTP, checks the chat-plugin API and
+ * rerun. (The canvas UI lives in the editor app, app/, and is checked there.) Run: bun scripts/e2e.ts
  */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 
 const dir = mkdtempSync(join(tmpdir(), "aet-e2e-"));
 const PORT = 8999, BASE = `http://localhost:${PORT}`;
-const env = { ...process.env, PORT: String(PORT), DB_PATH: join(dir, "e2e.sqlite"), TREE_JSON: join(dir, "tree.json"), PUBLIC_ORIGIN: BASE };
+const env = { ...process.env, PORT: String(PORT), DB_PATH: join(dir, "e2e.sqlite"), TREE_JSON: join(dir, "tree.json"), PUBLIC_ORIGIN: BASE, WORKER_ORIGIN: "" };
 const n = (id: string, text: string, x: number, y: number, isRoot = false) => ({ id, text, x, y, width: 260, height: 120, isRoot });
 const e = (id: string, source: string, target: string, label?: string) => ({ id, source, target, label });
 const TREE = {
@@ -86,24 +86,6 @@ try {
   const rc = adm2.chats.find((c: any) => c.id === rr.j.id);
   check("rerun: replayed path reaches the edited square and is done", !!rc && rc.parent_id === holeChat && rc.status === "done" && rc.messages.some((m: any) => m.node_ids.includes("gas")) && rc.messages.at(-1).content.includes("6%"), rc?.messages.at(-1)?.content.slice(0, 80));
 
-  // 8. the inspector page in a browser
-  const py = Bun.spawnSync(["python3", "-c", `
-from playwright.sync_api import sync_playwright
-with sync_playwright() as p:
-    b = p.chromium.launch(); pg = b.new_page(viewport={"width":1400,"height":900})
-    errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto("${BASE}/admin"); pg.wait_for_timeout(1200)
-    n_sq = pg.locator(".sq").count(); holes = pg.locator(".sq.hole").count()
-    pg.click("#chatlist li:nth-child(1)"); pg.wait_for_timeout(300)
-    onpath = pg.locator(".sq.onpath").count(); bubbles = pg.locator(".chat .msg.assistant .bubble").count()
-    pg.click("#closePanel"); closed = pg.locator("#panel.hidden").count()
-    pg.click("#openPanel"); opened = pg.locator("#panel:not(.hidden)").count()
-    pg.goto("${BASE}/admin?panel=1#chat=${mainChat}"); pg.wait_for_timeout(1000)
-    pop = pg.locator("body.popout .chat .msg").count()
-    print(n_sq, holes, onpath, bubbles, closed, opened, pop, len(errs), "|".join(errs)[:200])
-    b.close()`], { stdout: "pipe", stderr: "pipe" });
-  const out = py.stdout.toString().trim(); const [sq, holes, onpath, bubbles, closed, opened, pop, errs, errText] = out.split(" ");
-  check("inspector page renders, path highlights, panel toggles, pop-out shows chat", Number(sq) === 6 && Number(holes) === 0 && Number(onpath) >= 2 && Number(bubbles) >= 1 && closed === "1" && opened === "1" && Number(pop) >= 2 && errs === "0", out || py.stderr.toString().slice(0, 300));
 } catch (err) { check("e2e crashed", false, (err as Error).stack ?? String(err)); }
 finally { server.kill(); }
 console.log(fails.length ? `\n${fails.length} FAILED: ${fails.join("; ")}` : "\nall e2e checks passed");

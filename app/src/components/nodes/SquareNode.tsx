@@ -6,7 +6,7 @@ import { LockNotice } from "@/components/LockNotice";
 import { ROOT_PLACEHOLDER } from "@/lib/seed";
 import { LinkPills } from "@/components/LinkPills";
 
-export type SquareData = { text: string; isRoot: boolean; number: string; autoFocus?: boolean };
+export type SquareData = { text: string; isRoot: boolean; number: string; autoFocus?: boolean; onPath?: boolean; hole?: boolean };
 export type SquareNodeType = Node<SquareData, "square">;
 
 /**
@@ -51,9 +51,9 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
   return (
     <div
       style={{ width: width ?? 240, height: height ?? 120, boxShadow: editor ? `0 0 0 3px ${editor.color}` : undefined }}
-      className={`group relative flex flex-col rounded-md border-2 bg-white shadow-sm dark:bg-neutral-900 ${
-        required ? "border-red-400" : data.isRoot ? "border-amber-500" : selected ? "border-sky-500" : "border-neutral-300 dark:border-neutral-600"
-      } ${lockedBy ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}
+      className={`group relative flex flex-col rounded-lg border-2 bg-white shadow-sm dark:bg-neutral-900 ${
+        required || data.hole ? "border-red-400" : data.isRoot ? "border-amber-500" : selected ? "border-sky-500" : data.onPath ? "border-emerald-600" : "border-neutral-300 dark:border-neutral-600"
+      } ${lockedBy ? "bg-neutral-100 dark:bg-neutral-800" : ""} ${data.hole ? "bg-red-50 dark:bg-red-950/40" : ""}`}
     >
       {editor && (
         <span style={{ background: editor.color }} className="absolute -top-5 right-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-white">{editor.name}</span>

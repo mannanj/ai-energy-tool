@@ -11,6 +11,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createHmac } from "node:crypto";
 
 export interface TreeNode { id: string; text: string; x: number; y: number; width: number; height: number; isRoot: boolean; }
 export interface TreeEdge { id: string; source: string; target: string; label?: string; }
@@ -20,6 +21,38 @@ export const LIVE_PATH = resolve(import.meta.dir, "../data/tree.json");
 export const SEED_PATH = resolve(import.meta.dir, "../data/tree.seed.json");
 export const HOLE_REPLY = "I don't have a checked answer for this part yet. Call 2-1-1 (24/7) or visit 211virginia.org and a person there can find the right local help.";
 export const DECLINE_REPLY = "I can only help with one thing: electric bills for Dominion Energy customers in Fairfax County. For anything else, call 2-1-1 (24/7) or visit 211virginia.org.";
+
+/* ---------- the editor's Worker as the source (local: wrangler dev on WORKER_ORIGIN) ---------- */
+
+/** SESSION_SECRET from the environment, else from app/.dev.vars so local dev needs no copying. */
+function sessionSecret(): string | null {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  try {
+    const m = readFileSync(resolve(import.meta.dir, "../../app/.dev.vars"), "utf8").match(/^SESSION_SECRET=(.+)$/m);
+    return m ? m[1].trim().replace(/^"|"$/g, "") : null;
+  } catch { return null; }
+}
+export const workerOrigin = () => process.env.WORKER_ORIGIN || null;
+export const workerEnabled = () => !!workerOrigin() && !!sessionSecret() && !process.env.TREE_JSON;
+
+const b64u = (buf: Buffer) => buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function serviceCookie(): string {
+  const secret = sessionSecret()!;
+  const sign = (p: object) => { const body = b64u(Buffer.from(JSON.stringify(p))); return `${body}.${b64u(createHmac("sha256", secret).update(body).digest())}`; };
+  const exp = Math.floor(Date.now() / 1000) + 300;
+  return `aet_session=${sign({ id: "chat-server", firstName: "Chat", lastName: "Server", email: "chat@local", color: "#525252", exp })}`;
+}
+
+let workerCache: { doc: TreeDocument; at: number } | null = null;
+/** The live tree from the Worker's export route, cached for two seconds. Throws if the Worker is down. */
+export async function fetchWorkerTree(treeId = process.env.TREE_ID ?? "main"): Promise<TreeDocument> {
+  if (workerCache && Date.now() - workerCache.at < 2000) return workerCache.doc;
+  const res = await fetch(`${workerOrigin()}/api/tree/${treeId}/export`, { headers: { cookie: serviceCookie() } });
+  if (!res.ok) throw new Error(`Worker ${res.status} on export`);
+  const doc = (await res.json()) as TreeDocument;
+  workerCache = { doc, at: Date.now() };
+  return doc;
+}
 
 /** Where an imported tree is written: the TREE_JSON override if set, else the live file. */
 export const activePath = () => (process.env.TREE_JSON ? resolve(process.env.TREE_JSON) : LIVE_PATH);

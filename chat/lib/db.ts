@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { nanoid } from "./id";
 
 export type Role = "system" | "user" | "assistant";
-export interface Message { id: number; chat_id: string; seq: number; role: Role; content: string; created_at: string; node_id: string | null; verbatim: string | null; review: string | null; }
+export interface Message { id: number; chat_id: string; seq: number; role: Role; content: string; created_at: string; node_id: string | null; verbatim: string | null; review: string | null; drafts: string | null; }
 export interface Chat {
   id: string; title: string; model: string; created_at: string; updated_at: string;
   shared_at: string | null; source: string; scenario: string | null; system_prompt: string;
@@ -40,7 +40,7 @@ db.run("CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat_id, seq)");
 for (const col of ["status TEXT NOT NULL DEFAULT 'open'", "state TEXT NOT NULL DEFAULT '{}'"]) {
   try { db.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch { /* already there */ }
 }
-for (const col of ["node_id TEXT", "verbatim TEXT", "review TEXT"]) { try { db.run(`ALTER TABLE messages ADD COLUMN ${col}`); } catch { /* already there */ } }
+for (const col of ["node_id TEXT", "verbatim TEXT", "review TEXT", "drafts TEXT"]) { try { db.run(`ALTER TABLE messages ADD COLUMN ${col}`); } catch { /* already there */ } }
 for (const col of ["parent_id TEXT", "parent_seq INTEGER", "tree_updated_at TEXT", "archived INTEGER NOT NULL DEFAULT 0"]) { try { db.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch { /* already there */ } }
 
 const now = () => new Date().toISOString();
@@ -61,10 +61,10 @@ export function getMessages(chatId: string): Message[] {
   return db.query<Message, [string]>("SELECT * FROM messages WHERE chat_id = ? ORDER BY seq").all(chatId);
 }
 
-export function addMessage(chatId: string, role: Role, content: string, nodeId: string | null = null, extra: { verbatim?: string | null; review?: unknown } = {}): Message {
+export function addMessage(chatId: string, role: Role, content: string, nodeId: string | null = null, extra: { verbatim?: string | null; review?: unknown; drafts?: unknown } = {}): Message {
   const seq = (db.query<{ n: number }, [string]>("SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM messages WHERE chat_id = ?").get(chatId)?.n) ?? 1;
   const t = now();
-  db.query("INSERT INTO messages (chat_id, seq, role, content, created_at, node_id, verbatim, review) VALUES (?,?,?,?,?,?,?,?)").run(chatId, seq, role, content, t, nodeId, extra.verbatim ?? null, extra.review == null ? null : JSON.stringify(extra.review));
+  db.query("INSERT INTO messages (chat_id, seq, role, content, created_at, node_id, verbatim, review, drafts) VALUES (?,?,?,?,?,?,?,?,?)").run(chatId, seq, role, content, t, nodeId, extra.verbatim ?? null, extra.review == null ? null : JSON.stringify(extra.review), extra.drafts == null ? null : JSON.stringify(extra.drafts));
   const chat = getChat(chatId)!;
   const title = chat.title || (role === "user" ? content.replace(/\s+/g, " ").trim().slice(0, 80) : "");
   db.query("UPDATE chats SET updated_at = ?, title = ? WHERE id = ?").run(t, title, chatId);

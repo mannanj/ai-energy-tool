@@ -5,6 +5,8 @@ import { deriveTree, orderedNodes, toMarkdown } from "@/lib/derive";
 import { NodeRow } from "./NodeRow";
 import { LinkPills } from "@/components/LinkPills";
 import { HistoryView } from "./HistoryView";
+import { ChatsView } from "./ChatsView";
+import { useChatStore } from "@/lib/chats";
 
 const ADD_PLACEHOLDER =
   "Add a square. Paste or type text and links here, for example a question, an answer, a phone number, or a source URL like https://www.dss.virginia.gov/relief/pipp/. Links become pills you can copy and share. Press Cmd/Ctrl+Enter to add.";
@@ -26,7 +28,9 @@ export function TreePanel({ popout = false }: Props) {
   const [draft, setDraft] = useState("");
   const [attach, setAttach] = useState(true);
   const [copiedAll, setCopiedAll] = useState(false);
-  const [view, setView] = useState<"tree" | "history">("tree");
+  const view = useTreeStore((s) => s.panelView);
+  const setView = useTreeStore((s) => s.setPanelView);
+  const setInspect = useChatStore((s) => s.setInspect);
 
   const derived = useMemo(() => deriveTree(doc), [doc]);
   const list = useMemo(() => orderedNodes(derived, doc.tree.rootNodeId), [derived, doc.tree.rootNodeId]);
@@ -86,6 +90,7 @@ export function TreePanel({ popout = false }: Props) {
           <span className="mr-1 flex rounded border border-neutral-200 text-[11px] dark:border-neutral-700">
             <button onClick={() => setView("tree")} className={`px-2 py-0.5 ${view === "tree" ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}>tree</button>
             <button onClick={() => setView("history")} className={`px-2 py-0.5 ${view === "history" ? "bg-neutral-100 dark:bg-neutral-800" : ""}`} title="Version history">history</button>
+            <button onClick={() => { setView("chats"); setInspect(true); }} className={`px-2 py-0.5 ${view === "chats" ? "bg-neutral-100 dark:bg-neutral-800" : ""}`} title="Chats run against this tree">chats</button>
           </span>
           <button title={copiedAll ? "Copied" : "Copy whole tree as text"} onClick={copyAll} className="rounded px-2 py-1 text-[11px] hover:bg-neutral-100 dark:hover:bg-neutral-800">{copiedAll ? "✓ copied" : "copy tree"}</button>
           {!popout && (
@@ -107,6 +112,7 @@ export function TreePanel({ popout = false }: Props) {
       </div>
 
       {view === "history" && <HistoryView />}
+      {view === "chats" && <ChatsView />}
       {view === "tree" && <>
       {/* add box */}
       <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">

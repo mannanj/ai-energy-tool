@@ -3,6 +3,7 @@ import { Panel, useReactFlow } from "@xyflow/react";
 import { useTreeStore } from "@/lib/store";
 import { NODE_H, NODE_W } from "@/lib/seed";
 import { saveCheckpoint } from "@/lib/versions";
+import { useChatStore } from "@/lib/chats";
 
 function Btn({ title, onClick, children, disabled }: { title: string; onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
@@ -30,6 +31,10 @@ export function Toolbar() {
   const loadExample = useTreeStore((s) => s.loadExample);
   const resetEmpty = useTreeStore((s) => s.resetEmpty);
   const isRootSelected = useTreeStore((s) => s.doc.nodes.find((n) => n.id === s.selectedNodeId)?.isRoot ?? false);
+  const inspectOn = useChatStore((s) => s.inspectOn);
+  const setInspect = useChatStore((s) => s.setInspect);
+  const setPanelOpen = useTreeStore((s) => s.setPanelOpen);
+  const setPanelView = useTreeStore((s) => s.setPanelView);
 
   const addAtCenter = () => {
     const el = document.querySelector(".react-flow") as HTMLElement | null;
@@ -56,6 +61,11 @@ export function Toolbar() {
         <Btn title="Fit to tree (F)" onClick={() => rf.fitView({ padding: 0.2, duration: 300 })}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
         </Btn>
+        <div className="my-0.5 h-px bg-neutral-200 dark:bg-neutral-700" />
+        <button type="button" title={inspectOn ? "Hide chats on the canvas" : "Show chats on the canvas (the chat plugin)"} onClick={() => { setInspect(!inspectOn); if (!inspectOn) { setPanelOpen(true); setPanelView("chats"); } }}
+          className={`flex h-10 w-10 items-center justify-center rounded-md ${inspectOn ? "bg-emerald-600 text-white" : "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"}`}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-7.5A8 8 0 0 1 13 4a8 8 0 0 1 8 8z"/></svg>
+        </button>
         <div className="my-0.5 h-px bg-neutral-200 dark:bg-neutral-700" />
         <Btn title="Load example tree (Fairfax / Dominion)" onClick={async () => { if (confirm("Replace the canvas with the example tree for everyone? A checkpoint is saved first.")) { await saveCheckpoint("before example load"); loadExample(); setTimeout(() => rf.fitView({ padding: 0.2 }), 50); } }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v4M5 21v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><rect x="8" y="7" width="8" height="6" rx="1"/></svg>

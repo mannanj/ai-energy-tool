@@ -9,8 +9,10 @@ describe("codeCheck", () => {
   test("rejects a number not in the square", () => {
     expect(codeCheck(facts, "Call 703-222-0880 for help.", "").reason).toMatch(/number not in square/);
   });
-  test("allows a number the resident said", () => {
+  test("allows a number already in the conversation, including $7k style", () => {
     expect(codeCheck(facts, "Since you make $3,600 a month you are under the limit.", "we make about $3,600 a month").ok).toBe(true);
+    expect(codeCheck(facts, "At $7,000 a month you are over the limit.", "about $7k a month").ok).toBe(true);
+    expect(codeCheck(facts, "You are under 150% of the poverty level.", "Helper: Is your income at or under 150% of the federal poverty level?").ok).toBe(true);
     expect(codeCheck(facts, "Since you make $3,600 a month you are under the limit.", "").ok).toBe(false);
   });
   test("rejects a link not in the square, ignoring bold markers", () => {

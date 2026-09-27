@@ -18,6 +18,14 @@ Squares connected by arrows are the tree. Text and links live inside squares. Li
 Secrets on the Worker: `WORKSPACE_PASSWORD`, `SESSION_SECRET` (`wrangler secret put`). Local copies of
 both live in the macOS keychain under `ai-energy-tool-workspace-password` and `ai-energy-tool-session-secret`.
 
+## The chat plugin
+
+The speech-bubble button in the toolbar shows chats on the canvas and opens the panel's **chats** tab. Chats
+come from the chat server in `../chat` (`bun server.ts`, `NEXT_PUBLIC_CHAT_ORIGIN` in `.env.development`),
+which walks this very tree: it reads the live document from the Worker's export route before every turn. Each
+message is a draggable bubble beside the square its reply came from; bubble positions live in the shared
+document (Yjs map `bubbles`). "rerun from here" replays a chat through the current tree. See `../chat/README.md`.
+
 ## Run locally
 
 ```bash
@@ -30,7 +38,8 @@ bunx wrangler dev --port 8971                   # http://localhost:8971, passwor
 `.dev.vars` sets `EMAIL_PROVIDER=console`, so the sign-in page shows the magic link inline instead of emailing it.
 
 For fast UI iteration run `bun run dev -p 3010` alongside wrangler; `.env.development` points the page at
-`localhost:8971` for the API and WebSocket (CORS is allowed for `DEV_ORIGIN` in `.dev.vars`).
+`localhost:8971` for the API and WebSocket (CORS is allowed for `DEV_ORIGIN` in `.dev.vars`). For the chat
+plugin also run `cd ../chat && bun server.ts` (port 8972).
 
 ## Deploy
 

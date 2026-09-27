@@ -9,14 +9,13 @@
  *  GET  /api/chats/:id    one chat with messages
  *  POST /api/chats/:id/share  mark shared, return link
  *  GET  /api/chats/:id.txt    plain transcript
- *  GET  /admin            read-only tree canvas with chats overlaid
  *  GET  /api/tree         the tree document in use (+ holes / unreachable report)
  *  GET  /api/admin/chats  every chat with the tree squares each reply came from
  *
  * Run: bun server.ts   (reads chat/.env)
  */
 import { archiveAllBut, getChat, getMessages, listChats, setArchived, shareChat, transcript } from "./lib/db";
-import { runTurn, READER, tree, treeSource } from "./lib/turn";
+import { runTurn, READER, ensureTree, tree, treeSource } from "./lib/turn";
 import { isHole, validate, activePath } from "./lib/tree";
 import { SCENARIOS, rerunFrom, runScenario, continueChat } from "./scripts/simulate";
 import { writeFileSync } from "node:fs";
@@ -26,7 +25,15 @@ const ORIGIN = process.env.PUBLIC_ORIGIN ?? `http://localhost:${PORT}`;
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 const PUBLIC = new URL("./public/", import.meta.url).pathname;
 
+const CORS_ORIGINS = (process.env.CHAT_CORS_ORIGIN ?? "http://localhost:3010,http://localhost:8971").split(",").map((s) => s.trim());
 const json = (data: unknown, status = 200) => Response.json(data, { status });
+function cors(req: Request, res: Response): Response {
+  const origin = req.headers.get("Origin");
+  if (!origin || !CORS_ORIGINS.includes(origin)) return res;
+  const h = new Headers(res.headers);
+  h.set("Access-Control-Allow-Origin", origin); h.set("Access-Control-Allow-Headers", "Content-Type"); h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS"); h.set("Vary", "Origin");
+  return new Response(res.body, { status: res.status, headers: h });
+}
 const page = (name: string) => new Response(Bun.file(PUBLIC + name), { headers: { "Content-Type": "text/html;charset=utf-8" } });
 export const shareLink = (id: string) => `${ORIGIN}/c/${id}`;
 
@@ -46,6 +53,13 @@ async function handleChat(req: Request): Promise<Response> {
 Bun.serve({
   port: PORT,
   async fetch(req) {
+    if (req.method === "OPTIONS") return cors(req, new Response(null, { status: 204 }));
+    return cors(req, await route(req));
+  },
+});
+
+async function route(req: Request): Promise<Response> {
+  {
     const url = new URL(req.url);
     const p = url.pathname;
 
@@ -56,7 +70,6 @@ Bun.serve({
     if (p === "/style.css") return new Response(Bun.file(PUBLIC + "style.css"), { headers: { "Content-Type": "text/css" } });
 
     if (p === "/api/chat" && req.method === "POST") return handleChat(req);
-    if (p === "/admin") return page("admin.html");
     if (p === "/api/tree/import" && req.method === "POST") {
       const doc = await req.json().catch(() => null) as { nodes?: unknown[]; edges?: unknown[]; tree?: { rootNodeId?: string } } | null;
       const v = validate(doc);
@@ -80,21 +93,21 @@ Bun.serve({
       try { const id = await rerunFrom(m[1], Number(b.seq ?? 1), (l) => log.push(l)); return json({ id, link: shareLink(id), log }); }
       catch (e) { return json({ error: (e as Error).message, log }, 502); }
     }
-    if (p === "/api/tree") { const T = tree(); return json({ source: treeSource(), ...T.doc, report: T.report() }); }
+    if (p === "/api/tree") { const T = await ensureTree(); return json({ source: treeSource(), ...T.doc, report: T.report() }); }
     if (p === "/api/admin/archive" && req.method === "POST") {
       const b = await req.json().catch(() => ({})) as { keep?: number; id?: string; archived?: boolean };
       if (b.id) { setArchived(b.id, b.archived !== false); return json({ ok: true }); }
       return json(archiveAllBut(Number(b.keep ?? 3)));
     }
     if (p === "/api/admin/chats") {
-      const T = tree();
+      const T = await ensureTree();
       const includeArchived = url.searchParams.get("archived") === "1";
       const chats = listChats({ sharedOnly: false, limit: 500, includeArchived }).map((c) => {
         const msgs = getMessages(c.id);
         return { id: c.id, title: c.title, scenario: c.scenario, source: c.source, status: c.status, created_at: c.created_at, message_count: msgs.length, archived: !!c.archived,
           parent_id: c.parent_id, parent_seq: c.parent_seq, tree_updated_at: c.tree_updated_at,
           state: (() => { try { return JSON.parse(c.state); } catch { return {}; } })(),
-          messages: msgs.map((m) => ({ seq: m.seq, role: m.role, content: m.content, node_ids: m.node_id ? m.node_id.split(",") : [], verbatim: m.verbatim, review: m.review ? JSON.parse(m.review) : null })) };
+          messages: msgs.map((m) => ({ seq: m.seq, role: m.role, content: m.content, node_ids: m.node_id ? m.node_id.split(",") : [], verbatim: m.verbatim, review: m.review ? JSON.parse(m.review) : null, drafts: m.drafts ? JSON.parse(m.drafts) : null })) };
       });
       const visits: Record<string, number> = {};
       for (const c of chats) for (const m of c.messages) for (const n of m.node_ids) visits[n] = (visits[n] ?? 0) + 1;
@@ -122,7 +135,7 @@ Bun.serve({
       return json({ ...c, system_prompt: undefined, link: shareLink(c.id), messages: getMessages(c.id) });
     }
     return new Response("Not found", { status: 404 });
-  },
-});
+  }
+}
 
-{ const T = tree(); const r = T.report(); console.log(`chat helper on ${ORIGIN}  tree ${treeSource()} (${r.nodes} squares, ${r.edges} arrows, ${r.holes.length} holes, ${r.unreachable.length} unreachable)  reader ${READER()}  translator ${MODEL}`); }
+ensureTree().then((T) => { const r = T.report(); console.log(`chat helper on ${ORIGIN}  tree ${treeSource()} (${r.nodes} squares, ${r.edges} arrows, ${r.holes.length} holes, ${r.unreachable.length} unreachable)  reader ${READER()}  writer ${MODEL}`); });
