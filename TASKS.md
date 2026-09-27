@@ -21,11 +21,18 @@ Every request from today, in order. Done items name the commit.
 12. Two Worker secrets so prod can call the models. Run from `app/`:
     `wrangler secret put OPENROUTER_API_KEY` and `wrangler secret put TYPESAFE_API_KEY` (paste the values from `chat/.env`).
 
+## Done, continued
+
+13. Red dashed line from each helper bubble to the square it came from; follows drags.
+14. Reader tools: facts extraction (household, income, utility), yes/no detection, income math against the square's limits; the reader model is skipped when a tool decides. Unit tests added; 34 tests, 20/20 mutants.
+15. Inline trace under each helper reply in the inspector: tools, what they computed, read, write drafts, and milliseconds per step.
+16. Gold chats re-run locally through the Worker: over-income now answers on the first "No, we make 7k".
+18. Sign out in a menu under the avatar; panel handle at the right middle. `c47e246`
+19. Panel tabs look like page tabs; selected bordered, others green links. `5c7282f`
+20. Chats panel flattened: no card box, no dividers, left aligned.
+21. Regression fixed: chats draw on the canvas whenever the Chat tab is open; picking one filters to it.
+22. Minimap removed for now (it drew under the bubbles and looked half white). Add back later.
+
 ## To do
 
-13. Red line from each helper bubble to the square it came from, kept as things move.
-14. Reader tools: deterministic math (income vs threshold, household size) so "we make 7k a month" maps to No; check the other scenarios and judge them.
-15. Inline trace in the inspector only: which tool ran, what it computed, and how long each step took (read, tools, write, review).
-16. Re-run the example chats after 14 and 15.
 17. Review the golden chats and propose how to make the resident experience useful; better answers; the tools needed.
-18. Top right: sign out moves into a menu under the user's avatar; the panel handle moves to the far right, vertically centered.

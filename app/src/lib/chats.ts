@@ -4,7 +4,9 @@ import { create } from "zustand";
 export const CHAT_ORIGIN = process.env.NEXT_PUBLIC_CHAT_ORIGIN ?? "http://localhost:8972";
 
 export interface Review { used: "written" | "verbatim"; code_ok: boolean; covers?: number; adds_nothing?: number; tone?: number; reason?: string }
-export interface ChatMessage { seq: number; role: "user" | "assistant"; content: string; node_ids: string[]; verbatim: string | null; review: Review | null }
+export interface ToolRun { tool: string; ms: number; input?: string; result: string; label?: string | null; decided?: boolean }
+export interface Trace { tools: ToolRun[]; read?: { reader: string; ms: number; skipped?: boolean }; write?: { ms: number; attempts: number; used: string }; total_ms: number }
+export interface ChatMessage { seq: number; role: "user" | "assistant"; content: string; node_ids: string[]; verbatim: string | null; review: Review | null; trace: Trace | null }
 export interface Chat {
   id: string; title: string; scenario: string | null; source: string; status: "open" | "done"; created_at: string; message_count: number; archived: boolean;
   parent_id: string | null; parent_seq: number | null; tree_updated_at: string | null;

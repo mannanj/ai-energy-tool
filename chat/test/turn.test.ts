@@ -37,9 +37,10 @@ describe("runTurn", () => {
     expect(saved.node_id!.split(",").sort()).toEqual(["a", "b", "d"]); expect(saved.verbatim).toBe(b.reply);
   });
   test("No: step C is spoken and waited on; a hole answer gives the 2-1-1 line and ends as hole", async () => {
-    const s = [{}, { label: "No" }, { label: "any number" }];
+    const s = [{}, { label: "any number" }];
     const a = await runTurn(null, "rates went up", opts(s));
     const b = await runTurn(a.chatId, "no", opts(s));
+    expect(b.trace?.tools.some((t) => t.tool === "yes/no" && t.label === "No")).toBe(true); expect(b.trace?.read?.skipped).toBe(true);
     expect(b.status).toBe("open"); expect(b.state.nodeId).toBe("c"); expect(b.reply).toContain("Ride-along D"); expect(b.reply).toContain("Step C");
     const c = await runTurn(a.chatId, "four", opts(s));
     expect(c.status).toBe("done"); expect(c.reply).toBe(HOLE_REPLY); expect(c.state.ended_reason).toBe("hole"); expect(c.nodeIds).toEqual(["hole"]);

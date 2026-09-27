@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
-  ReactFlow, Background, BackgroundVariant, MarkerType, MiniMap, useReactFlow,
+  ReactFlow, Background, BackgroundVariant, MarkerType, useReactFlow,
   type Connection, type Edge, type EdgeChange, type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -11,6 +11,7 @@ import { SquareNode, type SquareNodeType } from "@/components/nodes/SquareNode";
 import { BubbleNode, type BubbleNodeType } from "@/components/nodes/BubbleNode";
 import { LabeledEdge } from "./LabeledEdge";
 import { ThreadEdge } from "./ThreadEdge";
+import { AnchorEdge } from "./AnchorEdge";
 import { chatColor, chatLabel, useChatStore } from "@/lib/chats";
 import { Toolbar } from "./Toolbar";
 import { StatsBadge } from "./StatsBadge";
@@ -18,7 +19,7 @@ import { Cursors } from "./Cursors";
 import { NODE_H, NODE_W } from "@/lib/seed";
 
 const nodeTypes = { square: SquareNode, bubble: BubbleNode };
-const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge };
+const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge, anchor: AnchorEdge };
 const BUBBLE_GAP = 14, BUBBLE_COL = 314, BUBBLE_STACK = 30;
 const spreadFor = (cols: number) => (cols ? 1 + (Math.min(cols, 4) * BUBBLE_COL) / 300 : 1);
 
@@ -69,6 +70,7 @@ export function TreeCanvas() {
             data: { chatId: cid, seq: msg.seq, role: msg.role, color, text: msg.content, nodeIds: msg.node_ids, review: msg.review, label: first && shown.length > 1 ? chatLabel(c) + " · " + cid : null } });
           first = false;
           if (prev) edgesOut.push({ id: `t:${prev}:${id}`, source: prev, target: id, type: "thread", selectable: false, deletable: false, focusable: false, data: { color } });
+          if (msg.role === "assistant") edgesOut.push({ id: `a:${id}`, source: id, sourceHandle: "anchor", target: sid, targetHandle: "anchor", type: "anchor", selectable: false, deletable: false, focusable: false, zIndex: 4 });
           prev = id;
         };
         if (pendingUser) push(pendingUser, at(pendingUser.seq, colX, rowY - 70));
@@ -206,7 +208,6 @@ export function TreeCanvas() {
       style={{ ["--xy-node-border-default" as string]: "transparent" }}
     >
       <Background variant={BackgroundVariant.Lines} gap={24} lineWidth={1} color="rgba(128,128,128,0.28)" />
-      <MiniMap pannable zoomable className="!bottom-3 !right-3 !h-24 !w-40 opacity-80" nodeStrokeWidth={2} />
       <Toolbar />
       <StatsBadge />
       <Cursors />

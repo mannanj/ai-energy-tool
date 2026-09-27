@@ -60,6 +60,7 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
         onResizeEnd={(_, p) => resizeNode(id, p.width, p.height)}
       />
       <Handle type="target" position={Position.Top} className="!h-3 !w-3 !bg-neutral-400" />
+      <Handle type="target" id="anchor" position={Position.Right} style={{ opacity: 0, pointerEvents: "none", top: "50%" }} />
       <Handle type="source" position={Position.Bottom} className="!h-3 !w-3 !bg-sky-500" />
 
       <div className="flex h-5 shrink-0 cursor-grab items-center justify-between rounded-t px-2 text-[10px] text-neutral-400 active:cursor-grabbing">

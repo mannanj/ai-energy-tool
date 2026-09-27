@@ -2,7 +2,7 @@ import { host } from "./host";
 import { nanoid } from "./id";
 
 export type Role = "system" | "user" | "assistant";
-export interface Message { id: number; chat_id: string; seq: number; role: Role; content: string; created_at: string; node_id: string | null; verbatim: string | null; review: string | null; drafts: string | null; }
+export interface Message { id: number; chat_id: string; seq: number; role: Role; content: string; created_at: string; node_id: string | null; verbatim: string | null; review: string | null; drafts: string | null; trace: string | null; }
 export interface Chat {
   id: string; title: string; model: string; created_at: string; updated_at: string;
   shared_at: string | null; source: string; scenario: string | null; system_prompt: string;
@@ -36,7 +36,7 @@ export function migrate(): void {
 )`);
   sql.run("CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat_id, seq)");
   for (const col of ["status TEXT NOT NULL DEFAULT 'open'", "state TEXT NOT NULL DEFAULT '{}'"]) { try { sql.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch {} }
-  for (const col of ["node_id TEXT", "verbatim TEXT", "review TEXT", "drafts TEXT"]) { try { sql.run(`ALTER TABLE messages ADD COLUMN ${col}`); } catch {} }
+  for (const col of ["node_id TEXT", "verbatim TEXT", "review TEXT", "drafts TEXT", "trace TEXT"]) { try { sql.run(`ALTER TABLE messages ADD COLUMN ${col}`); } catch {} }
   for (const col of ["parent_id TEXT", "parent_seq INTEGER", "tree_updated_at TEXT", "archived INTEGER NOT NULL DEFAULT 0"]) { try { sql.run(`ALTER TABLE chats ADD COLUMN ${col}`); } catch {} }
   sql.run(`CREATE TABLE IF NOT EXISTS prompts (
   id TEXT PRIMARY KEY,
@@ -65,10 +65,10 @@ export function getMessages(chatId: string): Message[] {
   return sql().all<Message>("SELECT * FROM messages WHERE chat_id = ? ORDER BY seq", [chatId]);
 }
 
-export function addMessage(chatId: string, role: Role, content: string, nodeId: string | null = null, extra: { verbatim?: string | null; review?: unknown; drafts?: unknown } = {}): Message {
+export function addMessage(chatId: string, role: Role, content: string, nodeId: string | null = null, extra: { verbatim?: string | null; review?: unknown; drafts?: unknown; trace?: unknown } = {}): Message {
   const seq = sql().get<{ n: number }>("SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM messages WHERE chat_id = ?", [chatId])?.n ?? 1;
   const t = now();
-  sql().run("INSERT INTO messages (chat_id, seq, role, content, created_at, node_id, verbatim, review, drafts) VALUES (?,?,?,?,?,?,?,?,?)", [chatId, seq, role, content, t, nodeId, extra.verbatim ?? null, extra.review == null ? null : JSON.stringify(extra.review), extra.drafts == null ? null : JSON.stringify(extra.drafts)]);
+  sql().run("INSERT INTO messages (chat_id, seq, role, content, created_at, node_id, verbatim, review, drafts, trace) VALUES (?,?,?,?,?,?,?,?,?,?)", [chatId, seq, role, content, t, nodeId, extra.verbatim ?? null, extra.review == null ? null : JSON.stringify(extra.review), extra.drafts == null ? null : JSON.stringify(extra.drafts), extra.trace == null ? null : JSON.stringify(extra.trace)]);
   const chat = getChat(chatId)!;
   const title = chat.title || (role === "user" ? content.replace(/\s+/g, " ").trim().slice(0, 80) : "");
   sql().run("UPDATE chats SET updated_at = ?, title = ? WHERE id = ?", [t, title, chatId]);

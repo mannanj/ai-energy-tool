@@ -1,11 +1,12 @@
 "use client";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTreeStore } from "@/lib/store";
 import { deriveTree, orderedNodes } from "@/lib/derive";
 import { NodeRow } from "./NodeRow";
 import { LinkPills } from "@/components/LinkPills";
 import { HistoryView } from "./HistoryView";
 import { ChatsView } from "./ChatsView";
+import { useChatStore } from "@/lib/chats";
 
 const ADD_PLACEHOLDER =
   "Add a square. Paste or type text and links here, for example a question, an answer, a phone number, or a source URL like https://www.dss.virginia.gov/relief/pipp/. Links become pills you can copy and share. Press Cmd/Ctrl+Enter to add.";
@@ -26,6 +27,8 @@ export function TreePanel({ popout = false }: Props) {
   const [attach, setAttach] = useState(true);
   const view = useTreeStore((s) => s.panelView);
   const setView = useTreeStore((s) => s.setPanelView);
+  const setInspect = useChatStore((s) => s.setInspect);
+  useEffect(() => { setInspect(view === "chats"); return () => setInspect(false); }, [view, setInspect]);
 
   const derived = useMemo(() => deriveTree(doc), [doc]);
   const list = useMemo(() => orderedNodes(derived, doc.tree.rootNodeId), [derived, doc.tree.rootNodeId]);

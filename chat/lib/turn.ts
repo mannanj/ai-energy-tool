@@ -5,6 +5,7 @@ import { writeReviewed, type Draft, type Review } from "./writer";
 import { activePrompt } from "./prompts";
 import { DECLINE_REPLY, HOLE_REPLY, Tree, fetchWorkerTree, isHole, loadTree, workerEnabled, type TreeNode } from "./tree";
 import { host } from "./host";
+import { extractFacts, incomeCheck, yesNo, type Facts, type ToolRun } from "./tools";
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 export const READER = readerName;
@@ -29,8 +30,9 @@ export async function ensureTree(): Promise<Tree> {
 }
 export const treeSource = () => (cached ?? (tree(), cached!)).source;
 
-export interface State { nodeId: string | null; path: string[]; done: boolean; ended_reason?: string; language?: string; misses?: number; }
-export interface TurnResult { chatId: string; reply: string; verbatim: string; review: Review | null; status: "open" | "done"; state: State; nodeIds: string[]; read: unknown }
+export interface State { nodeId: string | null; path: string[]; done: boolean; ended_reason?: string; language?: string; misses?: number; facts?: Facts; }
+export interface Trace { tools: ToolRun[]; read?: { reader: string; ms: number; skipped?: boolean }; write?: { ms: number; attempts: number; used: string }; total_ms: number }
+export interface TurnResult { chatId: string; reply: string; verbatim: string; review: Review | null; status: "open" | "done"; state: State; nodeIds: string[]; read: unknown; trace?: Trace }
 
 const NOT_HEARD = "Sorry, I didn't catch that. ";
 const meaning = (targets: TreeNode[]) => targets.map((t) => (isHole(t) ? "(unfilled square)" : t.text.replace(/\s+/g, " ").slice(0, 160))).join(" | ");
@@ -60,8 +62,29 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
     return { chatId: chat.id, reply: TREE_CHANGED, verbatim: TREE_CHANGED, review: null, status: "done", state: s, nodeIds: [], read: null };
   }
   const opts_ = T.options(cur.id).map((o) => ({ label: o.label, meaning: meaning(o.targets) }));
-  const r = await read(text, cur.text, first ? [] : opts_, first);
+  const t0 = Date.now();
+  const trace: Trace = { tools: [], total_ms: 0 };
+  const fx = extractFacts(text, s.facts ?? {}); s.facts = fx.facts; trace.tools.push(...fx.runs);
+  let decided: { label: string | null } | null = null;
+  if (!first && opts_.length) {
+    const labels = opts_.map((o) => o.label);
+    const math = incomeCheck(cur.text, s.facts, labels);
+    if (math) { trace.tools.push(math); if (math.decided) decided = { label: math.label ?? null }; }
+    if (!decided) {
+      const yn = yesNo(text);
+      const isYesNo = labels.some((l) => /^(yes|no)$/i.test(l));
+      if (yn && isYesNo) {
+        const has = labels.some((l) => l.toLowerCase() === yn.toLowerCase());
+        trace.tools.push({ tool: "yes/no", ms: 0, input: text.slice(0, 40), result: `${yn}${has ? "" : " (no such arrow; taking the fallback)"}`, label: has ? yn : null, decided: true });
+        decided = { label: has ? yn : null };
+      }
+    }
+  }
+  let r: Read;
+  if (decided) { r = { label: decided.label, onTopic: true, offTopic: false, bye: false, language: s.language ?? "en" }; trace.read = { reader: "tools", ms: 0, skipped: true }; }
+  else { const t1 = Date.now(); r = await read(text, cur.text, first ? [] : opts_, first); trace.read = { reader: READER(), ms: Date.now() - t1 }; }
   if (r.language && r.language !== "other") s.language = r.language;
+  const decidedFallback = !!decided && decided.label == null;
 
   const spoken: string[] = []; const nodeIds: string[] = [];
   const say = (n: TreeNode) => { nodeIds.push(n.id); s.path.push(n.id); spoken.push(isHole(n) ? HOLE_REPLY : n.text.trim()); };
@@ -73,11 +96,14 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
   } else if (r.bye && !r.label) {
     spoken.push("Okay. If it gets tight, call 2-1-1 (24/7) for local help. Take care."); finish("resident_ended");
   } else if (opts_.length && r.label == null) {
-    s.misses = (s.misses ?? 0) + 1;
     const fallback = T.select(cur.id, null).filter((n) => !T.children(cur.id).some((e) => e.target === n.id && (e.label?.trim() && !/^(either|any|all|always)$/i.test(e.label))));
-    if (r.offTopic) spoken.push(DECLINE_REPLY + "\n\nBack to your electric bill. " + cur.text.trim());
-    else if (s.misses >= 2 && fallback.length) advance(T, fallback, s, say, finish);
-    else spoken.push(NOT_HEARD + cur.text.trim());
+    if (decidedFallback && fallback.length) advance(T, fallback, s, say, finish);
+    else {
+      s.misses = (s.misses ?? 0) + 1;
+      if (r.offTopic) spoken.push(DECLINE_REPLY + "\n\nBack to your electric bill. " + cur.text.trim());
+      else if (s.misses >= 2 && fallback.length) advance(T, fallback, s, say, finish);
+      else spoken.push(NOT_HEARD + cur.text.trim());
+    }
   } else {
     advance(T, T.select(cur.id, r.label), s, say, finish);
   }
@@ -88,16 +114,19 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
   const isFixed = fixed.includes(verbatim.trim()) || spoken.every((x) => fixed.includes(x.trim()));
   if (!opts.verbatimOnly && verbatim.trim() && !isFixed) {
     const kind = s.done ? "answer" : "step";
+    const t2 = Date.now();
     try {
       const history = getMessages(chat.id).map((m) => ({ role: m.role, content: m.content }));
       const out = await writeReviewed(verbatim, history, kind, history.map((m) => m.content).join("\n"));
       drafts = out.drafts; rev = { ...out, drafts: undefined } as Review;
       if (rev.used === "written" && rev.written) reply = rev.written;
     } catch (e) { rev = { used: "verbatim", code_ok: false, reason: "writer error: " + (e as Error).message }; }
+    trace.write = { ms: Date.now() - t2, attempts: drafts.length, used: rev?.used ?? "verbatim" };
   }
+  trace.total_ms = Date.now() - t0;
   setState(chat.id, s, s.done ? "done" : "open");
-  addMessage(chat.id, "assistant", reply, nodeIds.join(","), { verbatim, review: rev, drafts });
-  return { chatId: chat.id, reply, verbatim, review: rev, status: s.done ? "done" : "open", state: s, nodeIds, read: r.raw ?? r };
+  addMessage(chat.id, "assistant", reply, nodeIds.join(","), { verbatim, review: rev, drafts, trace });
+  return { chatId: chat.id, reply, verbatim, review: rev, status: s.done ? "done" : "open", state: s, nodeIds, read: r.raw ?? r, trace };
 }
 
 function advance(T: Tree, targets: TreeNode[], s: State, say: (n: TreeNode) => void, finish: (why: string) => void) {

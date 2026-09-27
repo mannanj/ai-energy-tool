@@ -76,7 +76,7 @@ export async function chatApi(req: Request, origin: string): Promise<Response | 
         return { id: c.id, title: c.title, scenario: c.scenario, source: c.source, status: c.status, created_at: c.created_at, message_count: msgs.length, archived: !!c.archived,
           parent_id: c.parent_id, parent_seq: c.parent_seq, tree_updated_at: c.tree_updated_at,
           state: (() => { try { return JSON.parse(c.state); } catch { return {}; } })(),
-          messages: msgs.map((m) => ({ seq: m.seq, role: m.role, content: m.content, node_ids: m.node_id ? m.node_id.split(",") : [], verbatim: m.verbatim, review: m.review ? JSON.parse(m.review) : null, drafts: m.drafts ? JSON.parse(m.drafts) : null })) };
+          messages: msgs.map((m) => ({ seq: m.seq, role: m.role, content: m.content, node_ids: m.node_id ? m.node_id.split(",") : [], verbatim: m.verbatim, review: m.review ? JSON.parse(m.review) : null, drafts: m.drafts ? JSON.parse(m.drafts) : null, trace: m.trace ? JSON.parse(m.trace) : null })) };
       });
       const visits: Record<string, number> = {};
       for (const c of chats) for (const m of c.messages) for (const n of m.node_ids) visits[n] = (visits[n] ?? 0) + 1;

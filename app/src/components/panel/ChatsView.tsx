@@ -54,6 +54,14 @@ export function ChatsView() {
               <div key={m.seq} className={`relative ml-[34px] rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${m.role === "user" ? "rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.10)]" : "rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.10)]"}`}>
                 <Avatar role={m.role} />
                 <Rich text={m.content} />
+                {m.role === "assistant" && m.trace && (
+                  <div className="mt-1.5 rounded bg-black/5 px-2 py-1 font-mono text-[10px] leading-relaxed text-neutral-600 dark:bg-white/5 dark:text-neutral-300">
+                    {m.trace.tools.map((t, i) => <div key={i}><span className={t.tool === "math" ? "text-rose-600 dark:text-rose-400" : "text-sky-700 dark:text-sky-400"}>{t.tool}</span> {t.result}{t.decided ? " ✓" : ""} <span className="text-neutral-400">{t.ms}ms</span></div>)}
+                    {m.trace.read && <div><span className="text-sky-700 dark:text-sky-400">read</span> {m.trace.read.skipped ? "skipped, tools decided" : m.trace.read.reader} <span className="text-neutral-400">{m.trace.read.ms}ms</span></div>}
+                    {m.trace.write && <div><span className="text-sky-700 dark:text-sky-400">write</span> {m.trace.write.attempts} draft{m.trace.write.attempts === 1 ? "" : "s"}, used {m.trace.write.used} <span className="text-neutral-400">{m.trace.write.ms}ms</span></div>}
+                    <div><span className="text-neutral-400">total {m.trace.total_ms}ms</span></div>
+                  </div>
+                )}
                 {m.role === "assistant" && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
                     <span>{m.node_ids.length ? "square " + m.node_ids.join(", ") : "no square"}</span>
@@ -78,7 +86,7 @@ export function ChatsView() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
+      <div className="p-3">
         <button type="button" onClick={() => setPromptOpen(!promptOpen)} className="flex items-center gap-1 text-[12px] text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white">
           <span className={`inline-block transition-transform ${promptOpen ? "rotate-90" : ""}`}>▸</span> System prompt{picked && <span className="text-neutral-400"> · {picked.title}</span>}
         </button>
@@ -96,17 +104,13 @@ export function ChatsView() {
             </div>
           </div>
         )}
-      </div>
-      <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
-        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/60">
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); start(); } }} rows={3} placeholder="Start a new chat: write your first message here" className="w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
-          <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 w-full rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Starting…" : "Start new chat"}</button>
-        </div>
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); start(); } }} rows={3} placeholder="Start a new chat: write your first message here" className="mt-3 w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
+        <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Starting…" : "Start new chat"}</button>
       </div>
       <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">History ({chats.length})</div>
       <ul className="flex-1">
         {chats.map((x) => (
-          <li key={x.id} onClick={() => select(x.id)} className="cursor-pointer border-t border-neutral-200 px-3 py-2 text-[13px] hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
+          <li key={x.id} onClick={() => select(x.id)} className="cursor-pointer px-3 py-2 text-[13px] hover:bg-neutral-50 dark:hover:bg-neutral-800">
             <div className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: chatColor(shown, x.id) }} />{chatLabel(x)}</div>
             <div className="text-[11px] text-neutral-500">{[x.source + (x.parent_id ? ` of ${x.parent_id}@${x.parent_seq}` : ""), x.status, Math.floor(x.message_count / 2) + " turns", new Date(x.created_at).toLocaleString()].filter(Boolean).join(" · ")}</div>
           </li>

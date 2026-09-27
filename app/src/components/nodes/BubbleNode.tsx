@@ -38,6 +38,7 @@ export const BubbleNode = memo(function BubbleNode({ data }: NodeProps<BubbleNod
   return (
     <div style={{ width: 300 }} className="flex flex-col gap-1 text-[11px] leading-snug" onClick={() => select(data.chatId, true)}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none", left: 44 }} />
+      <Handle type="source" id="anchor" position={Position.Left} style={{ opacity: 0, pointerEvents: "none", left: 30, top: "50%" }} />
       {data.label && <span className="ml-[30px] pl-2 text-[9px] font-semibold" style={{ color: data.color }}>Chat: {data.label}</span>}
       <div title={user ? "Resident" : "square " + data.nodeIds.join(", ")}
         className={`nowheel relative ml-[30px] overflow-auto rounded-2xl border px-2 py-1.5 text-neutral-900 shadow-sm backdrop-blur-[2px] dark:text-neutral-100 ${user
