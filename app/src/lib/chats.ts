@@ -34,6 +34,7 @@ interface State {
   setShowArchived: (v: boolean) => void;
   rerun: (id: string, seq: number) => Promise<void>;
   runScenario: (name: string) => Promise<void>;
+  send: (chatId: string | null, message: string) => Promise<void>;
   archive: (id: string, archived: boolean) => Promise<void>;
 }
 
@@ -76,6 +77,12 @@ export const useChatStore = create<State>((set, get) => ({
   runScenario: async (name) => {
     set({ busy: `running ${name}`, error: null });
     try { const j = await jfetch<{ id: string }>("/api/admin/new", { method: "POST", body: JSON.stringify({ scenario: name }) }); await get().load(); get().select(j.id); }
+    catch (e) { set({ error: (e as Error).message }); }
+    finally { set({ busy: null }); }
+  },
+  send: async (chatId, message) => {
+    set({ busy: chatId ? "helper is replying" : "starting chat", error: null });
+    try { const j = await jfetch<{ chatId: string }>("/api/chat", { method: "POST", body: JSON.stringify({ chatId, message }) }); await get().load(); get().select(j.chatId, !!chatId); }
     catch (e) { set({ error: (e as Error).message }); }
     finally { set({ busy: null }); }
   },

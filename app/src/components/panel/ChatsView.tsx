@@ -14,11 +14,12 @@ const Avatar = ({ role }: { role: "user" | "assistant" }) => role === "user" ? (
 );
 
 export function ChatsView() {
-  const { chats, scenarios, shown, current, busy, error, reachable, showArchived } = useChatStore();
-  const { load, select, showAll, rerun, runScenario, setShowArchived, archive } = useChatStore.getState();
-  const [picked, setScenario] = useState("");
-  const scenario = picked || scenarios[0]?.name || "";
-  const opener = scenarios.find((x) => x.name === scenario)?.opener ?? "";
+  const { chats, shown, current, busy, error, reachable, showArchived } = useChatStore();
+  const { load, select, showAll, rerun, send, setShowArchived, archive } = useChatStore.getState();
+  const [draft, setDraft] = useState("");
+  const [reply, setReply] = useState("");
+  const start = () => { const t = draft.trim(); if (!t || busy) return; setDraft(""); send(null, t); };
+  const answer = (id: string) => { const t = reply.trim(); if (!t || busy) return; setReply(""); send(id, t); };
   useEffect(() => { load(); }, [load]);
   const c: Chat | undefined = chats.find((x) => x.id === current);
 
@@ -52,6 +53,12 @@ export function ChatsView() {
             );
           })}
         </div>
+        {c.status === "open" && (
+          <div className="sticky bottom-0 mt-auto border-t border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+            <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); answer(c.id); } }} rows={2} placeholder="Your reply" className="w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
+            <button type="button" disabled={!!busy || !reply.trim()} onClick={() => answer(c.id)} className="mt-1.5 rounded bg-emerald-700 px-3 py-1 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Sending…" : "Send"}</button>
+          </div>
+        )}
         {busy && <div className="fixed bottom-3 right-3 rounded-lg bg-emerald-700 px-3 py-1.5 text-[12px] text-white shadow">{busy}…</div>}
         {error && <div className="px-3 pb-3 text-[12px] text-red-600">{error}</div>}
       </div>
@@ -63,12 +70,8 @@ export function ChatsView() {
       <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
         <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/60">
           <div className="text-[13px] font-medium">New chat</div>
-          <label className="mt-2 block text-[11px] text-neutral-500">Resident</label>
-          <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="mt-0.5 w-full rounded border border-neutral-200 bg-white px-2 py-1 text-[12px] dark:border-neutral-700 dark:bg-neutral-900">
-            {scenarios.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
-          </select>
-          {opener && <div className="mt-2 rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"><span className="text-neutral-500">First message: </span>{opener}</div>}
-          <button type="button" disabled={!!busy || !scenario} onClick={() => runScenario(scenario)} className="mt-2 w-full rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Running…" : "Start chat"}</button>
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); start(); } }} rows={3} placeholder="Type your first message" className="mt-2 w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
+          <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 w-full rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Starting…" : "Start chat"}</button>
         </div>
       </div>
       <div className="flex items-center gap-2 px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">
