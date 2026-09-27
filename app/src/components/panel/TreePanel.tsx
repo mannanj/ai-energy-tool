@@ -75,7 +75,7 @@ export function TreePanel({ popout = false }: Props) {
       <div className="flex h-11 items-stretch gap-1 border-b border-neutral-200 bg-neutral-50 px-3 dark:border-neutral-700 dark:bg-neutral-800/60">
         <span className="-mb-px flex items-end gap-1">
           {(["chats", "tree", "history"] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={`mt-1.5 flex h-[calc(100%-6px)] items-center rounded-t-lg border border-b-0 px-5 text-[15px] ${view === v ? "border-neutral-200 bg-white font-medium text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white" : "border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"}`}>{v === "chats" ? "Chat" : v === "tree" ? "Tree" : "History"}</button>
+            <button key={v} onClick={() => setView(v)} className={`mt-1.5 flex h-[calc(100%-6px)] items-center rounded-t-lg border border-b-0 px-5 text-[15px] ${view === v ? "border-neutral-300 bg-white font-medium text-neutral-900 dark:border-neutral-600 dark:bg-neutral-900 dark:text-white" : "border-transparent text-emerald-700 hover:underline dark:text-emerald-400"}`}>{v === "chats" ? "Chat" : v === "tree" ? "Tree" : "History"}</button>
           ))}
         </span>
         {!popout && (
