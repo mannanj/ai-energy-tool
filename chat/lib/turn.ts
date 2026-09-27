@@ -37,29 +37,26 @@ export interface TurnResult { chatId: string; reply: string; verbatim: string; r
 const NOT_HEARD = "Sorry, I didn't catch that. ";
 const meaning = (targets: TreeNode[]) => targets.map((t) => (isHole(t) ? "(unfilled square)" : t.text.replace(/\s+/g, " ").slice(0, 160))).join(" | ");
 
-export const TREE_CHANGED = "The tree behind this chat changed since it started, so I can't continue it. Start a new chat and I'll go from the top.";
+export const TREE_CHANGED = "The tree behind this chat changed, so I'll start again from the top. Tell me what's going on with your electric bill.";
+export const GOODBYE = "Okay. If it gets tight, call 2-1-1 (24/7) for local help. Take care.";
 
 export async function runTurn(chatId: string | null, text: string, opts: { source?: string; scenario?: string; parentId?: string; parentSeq?: number; verbatimOnly?: boolean; reader?: Reader } = {}): Promise<TurnResult> {
   const read = opts.reader ?? defaultRead;
   const T = await ensureTree();
   let chat: Chat | null = chatId ? getChat(chatId) : null;
   if (!chat) chat = createChat({ model: MODEL, systemPrompt: `tree ${T.doc.tree.id} updated ${T.doc.tree.updatedAt} (${treeSource()}); reader ${READER()}; writer ${MODEL}; prompt ${activePrompt().id} ${activePrompt().title}`, source: opts.source, scenario: opts.scenario, parentId: opts.parentId, parentSeq: opts.parentSeq, treeUpdatedAt: T.doc.tree.updatedAt });
-  const s: State = { nodeId: null, path: [], done: false, ...getState<Partial<State>>(chat.id) };
+  const s: State = { nodeId: null, path: [], ...getState<Partial<State>>(chat.id), done: false };
   if (!Array.isArray(s.path)) s.path = [];
   addMessage(chat.id, "user", text);
 
-  if (chat.status === "done" || s.done) {
-    const reply = "This chat has ended. Start a new chat and I'll go from the top.";
-    addMessage(chat.id, "assistant", reply);
-    return { chatId: chat.id, reply, verbatim: reply, review: null, status: "done", state: s, nodeIds: [], read: null };
-  }
-
   const first = s.nodeId == null;
+  const rewalk = first && s.path.length > 0;
+  if (first) s.misses = 0;
   const cur = first ? T.root : T.node(s.nodeId!);
   if (!cur) {
-    s.done = true; s.ended_reason = "tree_changed"; setState(chat.id, s, "done");
+    s.nodeId = null; s.ended_reason = "tree_changed"; setState(chat.id, s, "open");
     addMessage(chat.id, "assistant", TREE_CHANGED, null, { verbatim: TREE_CHANGED });
-    return { chatId: chat.id, reply: TREE_CHANGED, verbatim: TREE_CHANGED, review: null, status: "done", state: s, nodeIds: [], read: null };
+    return { chatId: chat.id, reply: TREE_CHANGED, verbatim: TREE_CHANGED, review: null, status: "open", state: s, nodeIds: [], read: null };
   }
   const opts_ = T.options(cur.id).map((o) => ({ label: o.label, meaning: meaning(o.targets) }));
   const t0 = Date.now();
@@ -88,32 +85,34 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
 
   const spoken: string[] = []; const nodeIds: string[] = [];
   const say = (n: TreeNode) => { nodeIds.push(n.id); s.path.push(n.id); spoken.push(isHole(n) ? HOLE_REPLY : n.text.trim()); };
-  const finish = (why: string) => { s.done = true; s.ended_reason = why; };
+  const finish = (why: string) => { s.ended_reason = why; s.nodeId = null; };
+  const go = (targets: TreeNode[]) => advance(T, targets, s, say, finish, trace.tools);
 
   if (first) {
-    if (!r.onTopic) { spoken.push(DECLINE_REPLY); finish("off_topic"); }
-    else { s.path.push(cur.id); nodeIds.push(cur.id); advance(T, T.select(cur.id, null), s, say, finish); }
+    if (rewalk && r.bye && !r.onTopic) { spoken.push(GOODBYE); finish("resident_ended"); }
+    else if (!r.onTopic) { spoken.push(DECLINE_REPLY); finish("off_topic"); }
+    else { s.path.push(cur.id); nodeIds.push(cur.id); go(T.select(cur.id, null)); }
   } else if (r.bye && !r.label) {
-    spoken.push("Okay. If it gets tight, call 2-1-1 (24/7) for local help. Take care."); finish("resident_ended");
+    spoken.push(GOODBYE); finish("resident_ended");
   } else if (opts_.length && r.label == null) {
     const fallback = T.select(cur.id, null).filter((n) => !T.children(cur.id).some((e) => e.target === n.id && (e.label?.trim() && !/^(either|any|all|always)$/i.test(e.label))));
-    if (decidedFallback && fallback.length) advance(T, fallback, s, say, finish);
+    if (decidedFallback && fallback.length) go(fallback);
     else {
       s.misses = (s.misses ?? 0) + 1;
       if (r.offTopic) spoken.push(DECLINE_REPLY + "\n\nBack to your electric bill. " + cur.text.trim());
-      else if (s.misses >= 2 && fallback.length) advance(T, fallback, s, say, finish);
+      else if (s.misses >= 2 && fallback.length) go(fallback);
       else spoken.push(NOT_HEARD + cur.text.trim());
     }
   } else {
-    advance(T, T.select(cur.id, r.label), s, say, finish);
+    go(T.select(cur.id, r.label));
   }
 
   const verbatim = spoken.join("\n\n");
   let reply = verbatim; let rev: Review | null = null; let drafts: Draft[] = [];
-  const fixed = [DECLINE_REPLY, HOLE_REPLY, TREE_CHANGED, "Okay. If it gets tight, call 2-1-1 (24/7) for local help. Take care."];
+  const fixed = [DECLINE_REPLY, HOLE_REPLY, TREE_CHANGED, GOODBYE];
   const isFixed = fixed.includes(verbatim.trim()) || spoken.every((x) => fixed.includes(x.trim()));
   if (!opts.verbatimOnly && verbatim.trim() && !isFixed) {
-    const kind = s.done ? "answer" : "step";
+    const kind = s.nodeId == null ? "answer" : "step";
     const t2 = Date.now();
     try {
       const history = getMessages(chat.id).map((m) => ({ role: m.role, content: m.content }));
@@ -124,18 +123,25 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
     trace.write = { ms: Date.now() - t2, attempts: drafts.length, used: rev?.used ?? "verbatim" };
   }
   trace.total_ms = Date.now() - t0;
-  setState(chat.id, s, s.done ? "done" : "open");
+  setState(chat.id, s, "open");
   addMessage(chat.id, "assistant", reply, nodeIds.join(","), { verbatim, review: rev, drafts, trace });
-  return { chatId: chat.id, reply, verbatim, review: rev, status: s.done ? "done" : "open", state: s, nodeIds, read: r.raw ?? r, trace };
+  return { chatId: chat.id, reply, verbatim, review: rev, status: "open", state: s, nodeIds, read: r.raw ?? r, trace };
 }
 
-function advance(T: Tree, targets: TreeNode[], s: State, say: (n: TreeNode) => void, finish: (why: string) => void) {
+function advance(T: Tree, targets: TreeNode[], s: State, say: (n: TreeNode) => void, finish: (why: string) => void, tools: ToolRun[], hops = 0) {
   if (!targets.length) { say({ id: "__dead_end__", text: "" } as TreeNode); finish("dead_end"); s.nodeId = null; return; }
   const steps = targets.filter((n) => !T.isLeaf(n.id));
   const leaves = targets.filter((n) => T.isLeaf(n.id));
   for (const n of leaves) say(n);
   if (steps.length) {
     const next = steps[0];
+    const labels = T.options(next.id).map((o) => o.label);
+    const math = hops < 10 && labels.length ? incomeCheck(next.text, s.facts ?? {}, labels) : null;
+    if (math?.decided && math.label) {
+      tools.push(math); s.path.push(next.id);
+      advance(T, T.select(next.id, math.label), s, say, finish, tools, hops + 1);
+      return;
+    }
     say(next); s.nodeId = next.id;
   } else {
     s.nodeId = null; finish(leaves.some((n) => isHole(n)) ? "hole" : "answer");

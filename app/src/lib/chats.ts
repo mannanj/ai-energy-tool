@@ -1,5 +1,7 @@
 "use client";
 import { create } from "zustand";
+import { useTreeStore } from "./store";
+import { groupStacks, stackOfSeq } from "./stacks";
 
 export const CHAT_ORIGIN = process.env.NEXT_PUBLIC_CHAT_ORIGIN ?? "http://localhost:8972";
 
@@ -27,6 +29,7 @@ interface State {
   current: string | null;
   showArchived: boolean;
   busy: string | null;
+  pending: { chatId: string | null; userText: string; startedAt: number } | null;
   error: string | null;
   reachable: boolean;
 
@@ -58,11 +61,8 @@ const jfetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   return j;
 };
 
-export const useChatStore = create<State>((set, get) => ({
-  inspectOn: false, chats: [], visits: {}, holes: [], scenarios: [], shown: [], current: null, showArchived: false, busy: null, error: null, reachable: true,
-
-  setInspect: (v) => { set({ inspectOn: v }); if (v) get().load(); },
-  load: async () => {
+export const useChatStore = create<State>((set, get) => {
+  const refresh = async (extra: Partial<State> = {}) => {
     try {
       const [d, sc] = await Promise.all([
         jfetch<{ chats: Chat[]; visits: Record<string, number>; holes: string[] }>("/api/admin/chats" + (get().showArchived ? "?archived=1" : "")),
@@ -70,9 +70,14 @@ export const useChatStore = create<State>((set, get) => ({
       ]);
       const ids = new Set(d.chats.map((c) => c.id));
       const shown = get().shown.filter((id) => ids.has(id));
-      set({ chats: d.chats, visits: d.visits, holes: d.holes, scenarios: sc, reachable: true, error: null, shown: get().current ? shown : d.chats.map((c) => c.id) });
+      set({ chats: d.chats, visits: d.visits, holes: d.holes, scenarios: sc, reachable: true, error: null, shown: get().current ? shown : d.chats.map((c) => c.id), ...extra });
     } catch (e) { set({ reachable: false, error: (e as Error).message }); }
-  },
+  };
+  return {
+  inspectOn: false, chats: [], visits: {}, holes: [], scenarios: [], shown: [], current: null, showArchived: false, busy: null, pending: null, error: null, reachable: true,
+
+  setInspect: (v) => { set({ inspectOn: v }); if (v) get().load(); },
+  load: () => refresh(),
   select: (id, keep = false) => {
     if (!id) return get().showAll();
     const shown = keep ? [...get().shown] : [];
@@ -94,19 +99,20 @@ export const useChatStore = create<State>((set, get) => ({
     finally { set({ busy: null }); }
   },
   send: async (chatId, message) => {
-    set({ busy: chatId ? "helper is replying" : "starting chat", error: null });
-    try { const j = await jfetch<{ chatId: string }>("/api/chat", { method: "POST", body: JSON.stringify({ chatId, message }) }); await get().load(); get().select(j.chatId, !!chatId); }
-    catch (e) { set({ error: (e as Error).message }); }
-    finally { set({ busy: null }); }
+    set({ busy: chatId ? "helper is replying" : "starting chat", error: null, pending: { chatId, userText: message, startedAt: Date.now() } });
+    try { const j = await jfetch<{ chatId: string }>("/api/chat", { method: "POST", body: JSON.stringify({ chatId, message }) }); await refresh({ pending: null }); get().select(j.chatId, !!chatId); }
+    catch (e) { set({ error: (e as Error).message, pending: null }); }
+    finally { set({ busy: null, pending: null }); }
   },
   hover: null,
   setHover: (h) => set({ hover: h }),
   focus: null,
   jumpTo: (chatId, seq) => {
     const c = get().chats.find((x) => x.id === chatId); if (!c) return;
-    const msgs = seq == null ? c.messages : c.messages.filter((m) => m.seq === seq || (m.role === "user" && c.messages.some((h) => h.role === "assistant" && h.seq === seq && h.seq === m.seq + 1)));
+    const stacks = groupStacks(c, useTreeStore.getState().doc);
+    const hit = seq == null ? stacks : [stackOfSeq(stacks, seq)].filter((x) => x !== null);
     const ids = new Set<string>();
-    for (const m of msgs) { ids.add(`b:${chatId}:${m.seq}`); for (const n of m.node_ids) ids.add(n); }
+    for (const st of hit) { ids.add(st.id); ids.add(st.squareId); }
     set({ focus: { ids: [...ids], n: (get().focus?.n ?? 0) + 1 } });
   },
   prompts: [], activePrompt: null,
@@ -129,7 +135,8 @@ export const useChatStore = create<State>((set, get) => ({
     catch (e) { set({ error: (e as Error).message }); }
   },
   archive: async (id, archived) => { await jfetch("/api/admin/archive", { method: "POST", body: JSON.stringify({ id, archived }) }); await get().load(); },
-}));
+  };
+});
 
 export const chatColor = (shown: string[], id: string) => CHAT_COLORS[Math.max(0, shown.indexOf(id)) % CHAT_COLORS.length];
 export const chatLabel = (c: Chat) => (c.parent_id ? "rerun " : "") + (c.scenario || c.title || c.id).slice(0, 40);

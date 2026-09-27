@@ -8,19 +8,44 @@ const Avatar = ({ role, n }: { role: "user" | "assistant"; n: number }) => role 
   <span title="Resident" className="absolute -left-[34px] top-1.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#4a86e8] text-white">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
   </span>
-  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center leading-none text-[#4a86e8]"><span className="text-[9px]">#</span><span className="text-[17px] font-semibold">{n}</span></span>
+  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center leading-none text-[#4a86e8]"><span className="text-[9px]">#</span><span className="text-[12px] font-semibold">{n}</span></span>
   </>
 ) : (
   <>
   <span title="Helper" className="absolute -left-[34px] top-1.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#e8842a] text-white">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h6"/></svg>
   </span>
-  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center leading-none text-[#e8842a]"><span className="text-[9px]">#</span><span className="text-[17px] font-semibold">{n}</span></span>
+  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center leading-none text-[#e8842a]"><span className="text-[9px]">#</span><span className="text-[12px] font-semibold">{n}</span></span>
+  </>
+);
+
+const USER_BUBBLE = "rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.10)]";
+const HELPER_BUBBLE = "rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.10)]";
+const BUBBLE = "relative ml-[34px] rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm";
+const STEPS = ["reading your message", "walking the decision tree", "writing the reply", "checking the reply"];
+const DOTS = ["[animation-delay:0ms]", "[animation-delay:150ms]", "[animation-delay:300ms]"];
+
+function Thinking({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
+  const ms = Math.max(0, now - startedAt);
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <span className="flex items-center gap-1">{DOTS.map((d) => <span key={d} className={`h-1.5 w-1.5 animate-bounce rounded-full bg-[#e8842a] ${d}`} />)}</span>
+      <span className="text-[12px] text-neutral-600 dark:text-neutral-300">{STEPS[Math.floor(ms / 1500) % STEPS.length]}<span className="text-neutral-400"> · {Math.floor(ms / 1000)}s</span></span>
+    </div>
+  );
+}
+
+const PendingPair = ({ text, startedAt, nUser, nHelper }: { text: string; startedAt: number; nUser: number; nHelper: number }) => (
+  <>
+    <div className={`${BUBBLE} ${USER_BUBBLE}`}><Avatar role="user" n={nUser} /><Rich text={text} /></div>
+    <div className={`${BUBBLE} ${HELPER_BUBBLE}`}><Avatar role="assistant" n={nHelper} /><Thinking startedAt={startedAt} /></div>
   </>
 );
 
 export function ChatsView() {
-  const { chats, shown, current, busy, error, reachable, hover } = useChatStore();
+  const { chats, shown, current, busy, pending, error, reachable, hover } = useChatStore();
   const { load, select, showAll, rerun, send, archive, setHover, jumpTo } = useChatStore.getState();
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState("");
@@ -58,7 +83,7 @@ export function ChatsView() {
           {c.messages.map((m, i) => {
             const n = c.messages.slice(0, i + 1).filter((x) => x.role === m.role).length;
             return (
-              <div key={m.seq} onMouseEnter={() => setHover({ chatId: c.id, seq: m.seq })} onMouseLeave={() => setHover(null)} onClick={() => jumpTo(c.id, m.seq)} style={{ transform: hover && hover.chatId === c.id && hover.seq === m.seq ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`relative ml-[34px] cursor-pointer rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${hover && hover.chatId === c.id && hover.seq === m.seq ? "ring-2 ring-sky-400/50" : ""} ${m.role === "user" ? "rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.10)]" : "rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.10)]"}`}>
+              <div key={m.seq} onMouseEnter={() => setHover({ chatId: c.id, seq: m.seq })} onMouseLeave={() => setHover(null)} onClick={() => jumpTo(c.id, m.seq)} style={{ transform: hover && hover.chatId === c.id && hover.seq === m.seq ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`relative ml-[34px] cursor-pointer rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${hover && hover.chatId === c.id && hover.seq === m.seq ? "ring-2 ring-sky-400/50" : ""} ${m.role === "user" ? USER_BUBBLE : HELPER_BUBBLE}`}>
                 <Avatar role={m.role} n={n} />
                 <Rich text={m.content} />
                 {m.role === "assistant" && m.trace && (
@@ -78,14 +103,14 @@ export function ChatsView() {
               </div>
             );
           })}
+          {pending && pending.chatId === c.id && <PendingPair text={pending.userText} startedAt={pending.startedAt} nUser={c.messages.filter((x) => x.role === "user").length + 1} nHelper={c.messages.filter((x) => x.role === "assistant").length + 1} />}
         </div>
         {c.status === "open" && (
           <div className="sticky bottom-0 mt-auto border-t border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
             <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); answer(c.id); } }} rows={2} placeholder="Your reply" className="w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
-            <button type="button" disabled={!!busy || !reply.trim()} onClick={() => answer(c.id)} className="mt-1.5 rounded bg-emerald-700 px-3 py-1 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Sending…" : "Send"}</button>
+            <button type="button" disabled={!!busy || !reply.trim()} onClick={() => answer(c.id)} className="mt-1.5 rounded bg-emerald-700 px-3 py-1 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">Send</button>
           </div>
         )}
-        {busy && <div className="fixed bottom-3 right-3 rounded-lg bg-emerald-700 px-3 py-1.5 text-[12px] text-white shadow">{busy}…</div>}
         {error && <div className="px-3 pb-3 text-[12px] text-red-600">{error}</div>}
       </div>
     );
@@ -112,8 +137,9 @@ export function ChatsView() {
           </div>
         )}
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); start(); } }} rows={3} placeholder="Start a new chat: write your first message here" className="mt-3 w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
-        <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Starting…" : "Start new chat"}</button>
+        <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">Start new chat</button>
       </div>
+      {pending && pending.chatId == null && <div className="flex flex-col gap-2 px-3 pb-3"><PendingPair text={pending.userText} startedAt={pending.startedAt} nUser={1} nHelper={1} /></div>}
       <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">History ({chats.length})</div>
       <ul className="flex-1">
         {chats.map((x) => (
@@ -123,7 +149,6 @@ export function ChatsView() {
           </li>
         ))}
       </ul>
-      {busy && <div className="fixed bottom-3 right-3 rounded-lg bg-emerald-700 px-3 py-1.5 text-[12px] text-white shadow">{busy}…</div>}
       {error && <div className="px-3 pb-3 text-[12px] text-red-600">{error}</div>}
     </div>
   );

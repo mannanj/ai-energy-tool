@@ -38,3 +38,6 @@ Every request from today, in order. Done items name the commit.
 17. Golden chat review and proposal written: `docs/chat-experience-review.md`.
 23. Hover a chat or message in the panel: its bubbles on the canvas grow with a faint outline, and the same the other way from the canvas. Click jumps the canvas to it, zoomed out enough to see the squares around it.
 24. Seed data works for any deployment: the chat store seeds the gold chats lazily, matching their squares to the live tree by square text, archives stale seeded copies, and re-seeds when the seed version changes. The example tree now has stable square ids, and an empty tree room seeds the example tree itself.
+25. Your message shows instantly; the helper bubble shows dots and status while it thinks. `#n` numbers 30% smaller.
+26. Chats never end: after any outcome the next message walks the tree again with facts kept; income questions the math already knows are skipped.
+27. Canvas never hides a message: messages on the same square merge into one scrollable stack; thread lines blue 2px, bubble-to-square lines green.

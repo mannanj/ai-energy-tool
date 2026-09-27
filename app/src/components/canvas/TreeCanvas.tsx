@@ -17,10 +17,11 @@ import { Toolbar } from "./Toolbar";
 import { StatsBadge } from "./StatsBadge";
 import { Cursors } from "./Cursors";
 import { NODE_H, NODE_W } from "@/lib/seed";
+import { groupStacks } from "@/lib/stacks";
 
 const nodeTypes = { square: SquareNode, bubble: BubbleNode };
 const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge, anchor: AnchorEdge };
-const BUBBLE_GAP = 14, BUBBLE_COL = 314, BUBBLE_STACK = 30;
+const BUBBLE_GAP = 14, BUBBLE_COL = 314;
 const spreadFor = (cols: number) => (cols ? 1 + (Math.min(cols, 4) * BUBBLE_COL) / 300 : 1);
 
 export function TreeCanvas() {
@@ -61,40 +62,35 @@ export function TreeCanvas() {
     const nodesOut: BubbleNodeType[] = []; const edgesOut: Edge[] = [];
     if (!inspectOn) return { nodesOut, edgesOut };
     const sq = new Map(doc.nodes.map((n) => [n.id, n]));
+    const tree = { nodes: doc.nodes, tree: { rootNodeId: doc.tree.rootNodeId } };
     shown.forEach((cid, col) => {
       const c = chats.find((x) => x.id === cid); if (!c) return;
-      const color = chatColor(shown, cid); const used: Record<string, number> = {};
-      let prev: string | null = null; let pendingUser: typeof c.messages[number] | null = null; let first = true;
+      const color = chatColor(shown, cid);
       const nth = new Map<number, number>(); const cnt = { user: 0, assistant: 0 }; for (const m of c.messages) nth.set(m.seq, ++cnt[m.role]);
-      for (const m of c.messages) {
-        if (m.role === "user") { pendingUser = m; continue; }
-        const sid = m.node_ids.find((x) => sq.has(x)) ?? (m.node_ids.length ? doc.tree.rootNodeId : null); if (!sid || !sq.has(sid)) { pendingUser = null; continue; }
-        const n = sq.get(sid)!; const k = (used[sid] = (used[sid] ?? 0) + 1);
+      let prev: string | null = null;
+      groupStacks(c, tree).forEach((st, i) => {
+        const n = sq.get(st.squareId); if (!n) return;
         const base = { x: n.x * spread, y: n.y };
-        const at = (seq: number, dx: number, dy: number) => { const saved = bubblePos[`${cid}:${seq}`]; return saved ? { x: base.x + saved.x, y: base.y + saved.y } : { x: base.x + dx, y: base.y + dy }; };
-        const colX = n.width + BUBBLE_GAP + col * BUBBLE_COL, rowY = (k - 1) * BUBBLE_STACK;
-        const push = (msg: typeof m, pos: { x: number; y: number }) => {
-          const id = `b:${cid}:${msg.seq}`;
-          nodesOut.push({ id, type: "bubble", draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 5, position: pos,
-            data: { chatId: cid, seq: msg.seq, role: msg.role, color, text: msg.content, nodeIds: msg.node_ids, review: msg.review, label: first && shown.length > 1 ? chatLabel(c) + " · " + cid : null, hot: !!hover && hover.chatId === cid && (hover.seq == null || hover.seq === msg.seq), n: nth.get(msg.seq) ?? 0 } });
-          first = false;
-          if (prev) edgesOut.push({ id: `t:${prev}:${id}`, source: prev, target: id, type: "thread", selectable: false, deletable: false, focusable: false, data: { color } });
-          if (msg.role === "assistant") edgesOut.push({ id: `a:${id}`, source: id, sourceHandle: "anchor", target: sid, targetHandle: "anchor", type: "anchor", selectable: false, deletable: false, focusable: false, zIndex: 4 });
-          prev = id;
-        };
-        if (pendingUser) push(pendingUser, at(pendingUser.seq, colX, rowY - 70));
-        push(m, at(m.seq, colX, rowY));
-        pendingUser = null;
-      }
+        const saved = bubblePos[st.key];
+        const pos = saved ? { x: base.x + saved.x, y: base.y + saved.y } : { x: base.x + n.width + BUBBLE_GAP + col * BUBBLE_COL, y: base.y + (st.messages[0].role === "user" ? -70 : 0) };
+        const mine = !!hover && hover.chatId === cid;
+        nodesOut.push({ id: st.id, type: "bubble", draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 5, position: pos,
+          data: { chatId: cid, color, label: i === 0 && shown.length > 1 ? chatLabel(c) + " · " + cid : null,
+            hotChat: mine && hover.seq == null, hotSeq: mine && hover.seq != null ? hover.seq : null,
+            messages: st.messages.map((m) => ({ seq: m.seq, role: m.role, content: m.content, nodeIds: m.node_ids, review: m.review, n: nth.get(m.seq) ?? 0 })) } });
+        if (prev) edgesOut.push({ id: `t:${prev}:${st.id}`, source: prev, target: st.id, type: "thread", selectable: false, deletable: false, focusable: false, data: { color } });
+        edgesOut.push({ id: `a:${st.id}`, source: st.id, sourceHandle: "anchor", target: st.squareId, targetHandle: "anchor", type: "anchor", selectable: false, deletable: false, focusable: false, zIndex: 4 });
+        prev = st.id;
+      });
     });
     return { nodesOut, edgesOut };
   }, [inspectOn, chats, shown, doc.nodes, doc.tree.rootNodeId, bubblePos, spread, hover]);
   const squareOf = useCallback((bubbleKey: string) => {
-    const [cid, seqS] = bubbleKey.split(":"); const seq = Number(seqS);
-    const msgs = chats.find((c) => c.id === cid)?.messages ?? [];
-    const m = msgs.find((x) => x.seq >= seq && x.role === "assistant");
-    return doc.nodes.find((n) => m?.node_ids.includes(n.id)) ?? null;
-  }, [chats, doc.nodes]);
+    const cid = bubbleKey.slice(0, bubbleKey.lastIndexOf(":"));
+    const c = chats.find((x) => x.id === cid); if (!c) return null;
+    const st = groupStacks(c, { nodes: doc.nodes, tree: { rootNodeId: doc.tree.rootNodeId } }).find((x) => x.key === bubbleKey);
+    return doc.nodes.find((n) => n.id === st?.squareId) ?? null;
+  }, [chats, doc.nodes, doc.tree.rootNodeId]);
   const pathIds = useMemo(() => {
     if (!inspectOn) return new Set<string>();
     const ids = new Set<string>();

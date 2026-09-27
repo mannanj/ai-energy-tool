@@ -69,14 +69,13 @@ export async function continueChat(chatId: string, persona: string, maxTurns = 8
   for (const m of getMessages(chatId)) resident.push({ role: m.role === "user" ? "assistant" : "user", content: m.content });
   let id = chatId, turns = 0;
   for (let turn = 0; turn < maxTurns; turn++) {
-    if (getChat(id)?.status === "done") break;
     const next = (await complete(SIM_MODEL, resident, { temperature: 0.8, maxTokens: 120 })).trim() || "Ok.";
     resident.push({ role: "assistant", content: next });
     log(`  [${tag}] resident: ${next.slice(0, 90)}`);
     const t = await runTurn(id, next);
     turns++;
     log(`  [${tag}] helper:   ${t.reply.replace(/\s+/g, " ").slice(0, 90)}  (${t.status}; squares ${t.nodeIds.join(",") || "-"}; ${t.review?.used ?? "-"})`);
-    if (t.status === "done") { log(`  [${tag}] ended: ${t.state.ended_reason}`); break; }
+    if (t.state.ended_reason && t.state.nodeId == null) { log(`  [${tag}] outcome: ${t.state.ended_reason}`); break; }
     resident.push({ role: "user", content: t.reply });
   }
   return { chatId: id, turns };
@@ -86,7 +85,7 @@ export async function runScenario(s: Scenario, maxTurns = 8, log = console.log) 
   log(`  [${s.name}] resident: ${s.opener.slice(0, 90)}`);
   const t = await runTurn(null, s.opener, { source: "simulate", scenario: s.name });
   log(`  [${s.name}] helper:   ${t.reply.replace(/\s+/g, " ").slice(0, 90)}  (${t.status}; squares ${t.nodeIds.join(",") || "-"}; ${t.review?.used ?? "-"})`);
-  if (t.status !== "done") await continueChat(t.chatId, s.persona, maxTurns - 1, log, s.name);
+  if (t.state.nodeId != null) await continueChat(t.chatId, s.persona, maxTurns - 1, log, s.name);
   shareChat(t.chatId);
   return t.chatId;
 }
@@ -104,7 +103,7 @@ export async function rerunFrom(parentId: string, fromSeq: number, log = console
     const t = await runTurn(id, m.content, { source: "rerun", scenario: parent.scenario ?? undefined, parentId, parentSeq: fromSeq });
     id = t.chatId;
     log(`  [rerun] helper:   ${t.reply.replace(/\s+/g, " ").slice(0, 90)}  (${t.status}; squares ${t.nodeIds.join(",") || "-"}; ${t.review?.used ?? "-"})`);
-    if (t.status === "done") { shareChat(id); return id; }
+    if (t.state.nodeId == null && t.state.ended_reason) { shareChat(id); return id; }
   }
   if (!id) throw new Error("nothing to replay");
   await continueChat(id, persona, 8, log, "rerun");

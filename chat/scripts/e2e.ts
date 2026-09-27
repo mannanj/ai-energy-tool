@@ -32,28 +32,28 @@ try {
   check("tree loaded with one hole", t.report.holes.join() === "gas" && t.nodes.length === 6);
 
   let r = await chat(null, "My water bill is crazy high, can you help?");
-  check("water bill: declined and done", r.status === "done" && /can only help/.test(r.reply), r.reply.slice(0, 60));
+  check("water bill: declined, still open", r.status === "open" && /can only help/.test(r.reply), r.reply.slice(0, 60));
 
   r = await chat(null, "The rates for electricity have increased making it hard to make ends meet, what can I do?");
   check("opener: step0 asked, open", r.status === "open" && r.nodeIds.includes("step0"));
   const urgentChat = r.chatId;
   r = await chat(urgentChat, "yes, I got a disconnection notice yesterday");
-  check("Yes -> urgent leaf, done, numbers kept", r.status === "done" && r.nodeIds.includes("urgent") && r.reply.includes("866-366-4357") && r.reply.includes("2-1-1"), r.reply.slice(0, 80));
+  check("Yes -> urgent leaf, outcome, numbers kept", r.status === "open" && r.nodeIds.includes("urgent") && r.reply.includes("866-366-4357") && r.reply.includes("2-1-1"), r.reply.slice(0, 80));
 
   r = await chat(null, "Electric got expensive and I can't make ends meet");
   const mainChat = r.chatId;
   r = await chat(mainChat, "no notice, power is on, no medical stuff");
   check("No -> heat question", r.status === "open" && r.nodeIds.includes("heat"), r.reply.slice(0, 60));
   r = await chat(mainChat, "we have a heat pump so electric");
-  check("Electric -> answer, done, PIPP facts intact", r.status === "done" && r.nodeIds.includes("elec") && r.reply.includes("commonhelp.virginia.gov") && r.reply.includes("703-324-7500"), r.reply.slice(0, 80));
+  check("Electric -> answer, outcome, PIPP facts intact", r.status === "open" && r.nodeIds.includes("elec") && r.reply.includes("commonhelp.virginia.gov") && r.reply.includes("703-324-7500"), r.reply.slice(0, 80));
   r = await chat(mainChat, "anything else?");
-  check("ended chat stays ended", r.status === "done" && /has ended/.test(r.reply));
+  check("after an outcome the chat stays open", r.status === "open" && !/has ended/.test(r.reply));
 
   r = await chat(null, "help with my electric bill please");
   const holeChat = r.chatId;
   await chat(holeChat, "no, none of those");
   r = await chat(holeChat, "gas furnace");
-  check("Gas -> hole -> 2-1-1 line, done", r.status === "done" && r.nodeIds.includes("gas") && /2-1-1/.test(r.reply) && /don't have a checked answer/.test(r.reply), r.reply.slice(0, 80));
+  check("Gas -> hole -> 2-1-1 line, outcome", r.status === "open" && r.nodeIds.includes("gas") && /2-1-1/.test(r.reply) && /don't have a checked answer/.test(r.reply), r.reply.slice(0, 80));
 
   const adm = await fetch(BASE + "/api/admin/chats").then((x) => x.json());
   const mc = adm.chats.find((c: any) => c.id === mainChat);
@@ -72,7 +72,7 @@ try {
   check("rerun creates a linked chat", rr.s === 200 && !!rr.j.id, rr.j.error ?? "");
   const adm2 = await fetch(BASE + "/api/admin/chats").then((x) => x.json());
   const rc = adm2.chats.find((c: any) => c.id === rr.j.id);
-  check("rerun: replayed path reaches the edited square and is done", !!rc && rc.parent_id === holeChat && rc.status === "done" && rc.messages.some((m: any) => m.node_ids.includes("gas")) && rc.messages.at(-1).content.includes("6%"), rc?.messages.at(-1)?.content.slice(0, 80));
+  check("rerun: replayed path reaches the edited square", !!rc && rc.parent_id === holeChat && rc.status === "open" && rc.messages.some((m: any) => m.node_ids.includes("gas")) && rc.messages.at(-1).content.includes("6%"), rc?.messages.at(-1)?.content.slice(0, 80));
 
 } catch (err) { check("e2e crashed", false, (err as Error).stack ?? String(err)); }
 finally { server.kill(); }
