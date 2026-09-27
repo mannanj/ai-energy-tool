@@ -24,16 +24,16 @@ export function AppShell() {
         </ReactFlowProvider>
         <div className="absolute right-3 top-3 z-10 flex items-start gap-2">
           <Presence />
-          {!panelOpen && (
-            <button
-              title="Open panel"
-              onClick={() => setPanelOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-200 bg-white/95 text-neutral-700 shadow-md hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-neutral-200 dark:hover:bg-neutral-800"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>
-            </button>
-          )}
         </div>
+        {!panelOpen && (
+          <button
+            title="Open panel"
+            onClick={() => setPanelOpen(true)}
+            className="absolute right-0 top-1/2 z-10 flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-neutral-200 bg-white/95 text-neutral-700 shadow-md hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+        )}
       </div>
       {panelOpen && <TreePanel />}
     </div>

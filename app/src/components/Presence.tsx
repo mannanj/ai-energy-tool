@@ -1,10 +1,12 @@
 "use client";
+import { useState } from "react";
 import { useTreeStore } from "@/lib/store";
 import { api, fullName } from "@/lib/api";
 
 const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
 export function Presence() {
+  const [menu, setMenu] = useState(false);
   const me = useTreeStore((s) => s.me);
   const peers = useTreeStore((s) => s.peers);
   const connected = useTreeStore((s) => s.connected);
@@ -20,10 +22,17 @@ export function Presence() {
           {initials(p.user.name)}
         </span>
       ))}
-      <span title={`${fullName(me)} (you)`} style={{ background: me.color }} className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-white dark:ring-neutral-900">
-        {initials(fullName(me))}
+      <span className="relative">
+        <button type="button" onClick={() => setMenu(!menu)} title={`${fullName(me)} (you)`} style={{ background: me.color }} className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-white dark:ring-neutral-900">
+          {initials(fullName(me))}
+        </button>
+        {menu && (
+          <div onMouseLeave={() => setMenu(false)} className="absolute right-0 top-9 z-20 min-w-[160px] rounded-lg border border-neutral-200 bg-white py-1 text-[12px] shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+            <div className="px-3 py-1.5 text-neutral-500">{fullName(me)}</div>
+            <button type="button" onClick={signOut} className="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800">Sign out</button>
+          </div>
+        )}
       </span>
-      <button onClick={signOut} title="Sign out" className="ml-1 rounded px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">sign out</button>
     </div>
   );
 }
