@@ -55,7 +55,7 @@ export function TreeCanvas() {
     if (!focus) return;
     const present = focus.ids.filter((id) => rf.getNode(id));
     if (!present.length) return;
-    rf.fitView({ nodes: present.map((id) => ({ id })), padding: 0.6, maxZoom: 0.9, duration: 450 });
+    rf.fitView({ nodes: present.map((id) => ({ id })), padding: 0.35, maxZoom: 1.2, duration: 450 });
   }, [focus, rf]);
   const bubbles = useMemo(() => {
     const nodesOut: BubbleNodeType[] = []; const edgesOut: Edge[] = [];
