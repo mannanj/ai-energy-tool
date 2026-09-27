@@ -63,11 +63,20 @@ export function incomeCheck(squareText: string, facts: Facts, options: string[])
   const th = thresholds(squareText);
   if (!th.length) return null;
   if (facts.income_monthly == null) return { tool: "math", ms: Date.now() - t0, result: `income limit square (${th.map((t) => `${t.size}p $${t.monthly}`).join(", ")}) but no income stated`, decided: false };
-  const size = facts.household ?? 1;
-  const limit = limitFor(th, size);
+  const lim = th.map((t) => `${t.size}p $${t.monthly}`).join(", ");
+  if (facts.household == null) {
+    const smallest = limitFor(th, 1)!, largest = limitFor(th, 8)!;
+    if (facts.income_monthly <= smallest) return decide(t0, facts, 1, smallest, true, options, "any household size qualifies");
+    if (facts.income_monthly > largest) return decide(t0, facts, 8, largest, false, options, "over the limit even for 8 people");
+    return { tool: "math", ms: Date.now() - t0, input: `$${facts.income_monthly}/mo`, result: `$${facts.income_monthly}/mo needs the household size to compare (${lim}); leaving it to the reader`, decided: false };
+  }
+  const limit = limitFor(th, facts.household);
   if (limit == null) return null;
-  const under = facts.income_monthly <= limit;
+  return decide(t0, facts, facts.household, limit, facts.income_monthly <= limit, options);
+}
+
+function decide(t0: number, facts: Facts, size: number, limit: number, under: boolean, options: string[], note = ""): ToolRun {
   const label = under ? "Yes" : "No";
   const has = options.some((o) => o.toLowerCase() === label.toLowerCase());
-  return { tool: "math", ms: Date.now() - t0, input: `$${facts.income_monthly}/mo, ${size} in home`, result: `$${facts.income_monthly} ${under ? "≤" : ">"} $${limit} limit for ${size}${facts.household == null ? " (size unknown, assumed 1)" : ""} → ${label}${has ? "" : " (no such arrow; taking the fallback)"}`, label: has ? label : null, decided: true };
+  return { tool: "math", ms: Date.now() - t0, input: `$${facts.income_monthly}/mo, ${size} in home`, result: `$${facts.income_monthly} ${under ? "≤" : ">"} $${limit} limit for ${size}${note ? " (" + note + ")" : ""} → ${label}${has ? "" : " (no such arrow; taking the fallback)"}`, label: has ? label : null, decided: true };
 }

@@ -31,6 +31,11 @@ describe("incomeCheck", () => {
     const r = incomeCheck(SQUARE, { household: 4, income_monthly: 3600 }, ["Yes", "No"]);
     expect(r?.label).toBe("Yes");
   });
+  test("income without household size is left to the reader unless certain", () => {
+    expect(incomeCheck(SQUARE, { income_monthly: 3600 }, ["Yes"])?.decided).toBe(false);
+    expect(incomeCheck(SQUARE, { income_monthly: 1500 }, ["Yes"])?.label).toBe("Yes");
+    expect(incomeCheck(SQUARE, { income_monthly: 9000 }, ["Yes"])?.decided).toBe(true);
+  });
   test("no income yet: not decided", () => { expect(incomeCheck(SQUARE, { household: 2 }, ["Yes"])?.decided).toBe(false); });
   test("not an income square", () => { expect(incomeCheck("Dominion or NOVEC?", { income_monthly: 1 }, ["Dominion"])).toBeNull(); });
 });

@@ -23,7 +23,7 @@ Every request from today, in order. Done items name the commit.
 
 ## Done, continued
 
-13. Red dashed line from each helper bubble to the square it came from; follows drags.
+13. Blue line from each helper bubble to the square it came from; follows drags.
 14. Reader tools: facts extraction (household, income, utility), yes/no detection, income math against the square's limits; the reader model is skipped when a tool decides. Unit tests added; 34 tests, 20/20 mutants.
 15. Inline trace under each helper reply in the inspector: tools, what they computed, read, write drafts, and milliseconds per step.
 16. Gold chats re-run locally through the Worker: over-income now answers on the first "No, we make 7k".
