@@ -74,8 +74,8 @@
   .callout { position: absolute; width: 300px; box-sizing: border-box; font-size: 11px; line-height: 1.35; z-index: 3; display: flex; flex-direction: column; gap: 4px; }
   .callout .r, .callout .h { max-width: 92%; padding: 6px 9px; border-radius: 14px; box-shadow: 0 1px 4px #0002; }
   .callout .r { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
-  .callout .h { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c, var(--accent)); border-bottom-left-radius: 4px; max-height: 5.2em; overflow: hidden; }
-  .callout.open .h { max-height: none; }
+  .callout .r { max-height: 6.5em; overflow: auto; }
+  .callout .h { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c, var(--accent)); border-bottom-left-radius: 4px; max-height: 9em; overflow: auto; overscroll-behavior: contain; }
   .callout .k { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .callout .row { display: flex; gap: 6px; align-items: center; padding-left: 4px; }
   .callout .row button { padding: 1px 7px; font-size: 10px; }
@@ -222,7 +222,7 @@
   canvas.addEventListener("mousedown", (e) => { drag = { x: e.clientX - view.x, y: e.clientY - view.y }; canvas.classList.add("dragging"); });
   window.addEventListener("mousemove", (e) => { if (drag) { view.x = e.clientX - drag.x; view.y = e.clientY - drag.y; apply(); } });
   window.addEventListener("mouseup", () => { drag = null; canvas.classList.remove("dragging"); });
-  canvas.addEventListener("wheel", (e) => { e.preventDefault(); const k = Math.min(2.5, Math.max(0.2, view.k * (e.deltaY < 0 ? 1.1 : 0.9))); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top; view.x = mx - (mx - view.x) * (k / view.k); view.y = my - (my - view.y) * (k / view.k); view.k = k; apply(); }, { passive: false });
+  canvas.addEventListener("wheel", (e) => { if (e.target.closest(".callout .h, .callout .r")) return; e.preventDefault(); const k = Math.min(2.5, Math.max(0.2, view.k * (e.deltaY < 0 ? 1.1 : 0.9))); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top; view.x = mx - (mx - view.x) * (k / view.k); view.y = my - (my - view.y) * (k / view.k); view.k = k; apply(); }, { passive: false });
 
   function drawList() {
     list.innerHTML = "";
@@ -271,7 +271,6 @@
       const h = document.createElement("div"); h.className = "h"; h.innerHTML = render(m.content); h.title = "square " + m.node_ids.join(", "); d.append(h);
       const row = document.createElement("div"); row.className = "row";
       if (m.review) { const p = document.createElement("span"); p.className = "pill " + (m.review.used === "written" ? "ok" : "bad"); p.textContent = m.review.used; p.title = m.review.reason || `covers ${fmt(m.review.covers)} adds-nothing ${fmt(m.review.adds_nothing)} asks-same ${fmt(m.review.tone)}`; row.append(p); }
-      const more = document.createElement("button"); more.type = "button"; more.textContent = "more"; more.onclick = (e) => { e.stopPropagation(); d.classList.toggle("open"); more.textContent = d.classList.contains("open") ? "less" : "more"; drawThreads(); }; row.append(more);
       const rr = document.createElement("button"); rr.type = "button"; rr.textContent = "↻ rerun from here"; rr.onclick = (e) => { e.stopPropagation(); rerun(c.id, m.seq); }; row.append(rr);
       d.append(row);
       d.addEventListener("mousedown", (e) => e.stopPropagation());
