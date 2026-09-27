@@ -45,6 +45,10 @@ interface State {
   activatePrompt: (id: string) => Promise<void>;
   renamePrompt: (id: string, title: string) => Promise<void>;
   archive: (id: string, archived: boolean) => Promise<void>;
+  hover: { chatId: string; seq?: number } | null;
+  setHover: (h: { chatId: string; seq?: number } | null) => void;
+  focus: { ids: string[]; n: number } | null;
+  jumpTo: (chatId: string, seq?: number) => void;
 }
 
 const jfetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -94,6 +98,16 @@ export const useChatStore = create<State>((set, get) => ({
     try { const j = await jfetch<{ chatId: string }>("/api/chat", { method: "POST", body: JSON.stringify({ chatId, message }) }); await get().load(); get().select(j.chatId, !!chatId); }
     catch (e) { set({ error: (e as Error).message }); }
     finally { set({ busy: null }); }
+  },
+  hover: null,
+  setHover: (h) => set({ hover: h }),
+  focus: null,
+  jumpTo: (chatId, seq) => {
+    const c = get().chats.find((x) => x.id === chatId); if (!c) return;
+    const msgs = seq == null ? c.messages : c.messages.filter((m) => m.seq === seq || (m.role === "user" && c.messages.some((h) => h.role === "assistant" && h.seq === seq && h.seq === m.seq + 1)));
+    const ids = new Set<string>();
+    for (const m of msgs) { ids.add(`b:${chatId}:${m.seq}`); for (const n of m.node_ids) ids.add(n); }
+    set({ focus: { ids: [...ids], n: (get().focus?.n ?? 0) + 1 } });
   },
   prompts: [], activePrompt: null,
   loadPrompts: async () => {

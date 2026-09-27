@@ -14,8 +14,8 @@ const Avatar = ({ role }: { role: "user" | "assistant" }) => role === "user" ? (
 );
 
 export function ChatsView() {
-  const { chats, shown, current, busy, error, reachable } = useChatStore();
-  const { load, select, showAll, rerun, send, archive } = useChatStore.getState();
+  const { chats, shown, current, busy, error, reachable, hover } = useChatStore();
+  const { load, select, showAll, rerun, send, archive, setHover, jumpTo } = useChatStore.getState();
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState("");
   const start = () => { const t = draft.trim(); if (!t || busy) return; setDraft(""); send(null, t); };
@@ -51,7 +51,7 @@ export function ChatsView() {
         <div className="flex flex-col gap-2 px-3 pb-6">
           {c.messages.map((m) => {
             return (
-              <div key={m.seq} className={`relative ml-[34px] rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${m.role === "user" ? "rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.10)]" : "rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.10)]"}`}>
+              <div key={m.seq} onMouseEnter={() => setHover({ chatId: c.id, seq: m.seq })} onMouseLeave={() => setHover(null)} onClick={() => jumpTo(c.id, m.seq)} style={{ transform: hover && hover.chatId === c.id && hover.seq === m.seq ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`relative ml-[34px] cursor-pointer rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${hover && hover.chatId === c.id && hover.seq === m.seq ? "ring-2 ring-sky-400/50" : ""} ${m.role === "user" ? "rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.10)]" : "rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.10)]"}`}>
                 <Avatar role={m.role} />
                 <Rich text={m.content} />
                 {m.role === "assistant" && m.trace && (
@@ -110,7 +110,7 @@ export function ChatsView() {
       <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">History ({chats.length})</div>
       <ul className="flex-1">
         {chats.map((x) => (
-          <li key={x.id} onClick={() => select(x.id)} className="cursor-pointer px-3 py-2 text-[13px] hover:bg-neutral-50 dark:hover:bg-neutral-800">
+          <li key={x.id} onMouseEnter={() => setHover({ chatId: x.id })} onMouseLeave={() => setHover(null)} onClick={() => { select(x.id); jumpTo(x.id); }} style={{ transform: hover?.chatId === x.id ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`cursor-pointer rounded-lg px-3 py-2 text-[13px] ${hover?.chatId === x.id ? "ring-2 ring-sky-400/50" : ""}`}>
             <div className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: chatColor(shown, x.id) }} />{chatLabel(x)}</div>
             <div className="text-[11px] text-neutral-500">{[x.source + (x.parent_id ? ` of ${x.parent_id}@${x.parent_seq}` : ""), x.status, Math.floor(x.message_count / 2) + " turns", new Date(x.created_at).toLocaleString()].filter(Boolean).join(" · ")}</div>
           </li>

@@ -3,7 +3,7 @@ import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { useChatStore, type Review } from "@/lib/chats";
 
-export type BubbleData = { chatId: string; seq: number; role: "user" | "assistant"; color: string; text: string; nodeIds: string[]; review: Review | null; label: string | null };
+export type BubbleData = { chatId: string; seq: number; role: "user" | "assistant"; color: string; text: string; nodeIds: string[]; review: Review | null; label: string | null; hot?: boolean };
 export type BubbleNodeType = Node<BubbleData, "bubble">;
 
 const Human = () => (
@@ -34,14 +34,15 @@ export const BubbleNode = memo(function BubbleNode({ data }: NodeProps<BubbleNod
   const rerun = useChatStore((s) => s.rerun);
   const busy = useChatStore((s) => s.busy);
   const select = useChatStore((s) => s.select);
+  const setHover = useChatStore((s) => s.setHover);
   const user = data.role === "user";
   return (
-    <div style={{ width: 300 }} className="flex flex-col gap-1 text-[11px] leading-snug" onClick={() => select(data.chatId, true)}>
+    <div style={{ width: 300, transform: data.hot ? "scale(1.04)" : undefined, transition: "transform 120ms" }} className="flex flex-col gap-1 text-[11px] leading-snug" onClick={() => select(data.chatId, true)} onMouseEnter={() => setHover({ chatId: data.chatId, seq: data.seq })} onMouseLeave={() => setHover(null)}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none", left: 44 }} />
       <Handle type="source" id="anchor" position={Position.Left} style={{ opacity: 0, pointerEvents: "none", left: 30, top: "50%" }} />
       {data.label && <span className="ml-[30px] pl-2 text-[9px] font-semibold" style={{ color: data.color }}>Chat: {data.label}</span>}
       <div title={user ? "Resident" : "square " + data.nodeIds.join(", ")}
-        className={`nowheel relative ml-[30px] overflow-auto rounded-2xl border px-2 py-1.5 text-neutral-900 shadow-sm backdrop-blur-[2px] dark:text-neutral-100 ${user
+        className={`nowheel relative ml-[30px] overflow-auto rounded-2xl border px-2 py-1.5 text-neutral-900 shadow-sm backdrop-blur-[2px] dark:text-neutral-100 ${data.hot ? "ring-2 ring-sky-400/50" : ""} ${user
           ? "max-h-[6.5em] rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.12)]"
           : "max-h-[9em] rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.12)]"}`}>
         {user ? <Human /> : <Robot />}<Rich text={data.text} />

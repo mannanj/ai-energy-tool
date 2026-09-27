@@ -49,6 +49,14 @@ export function TreeCanvas() {
   const spread = inspectOn ? spreadFor(shown.length) : 1;
   const spreadRef = useRef(spread); spreadRef.current = spread;
 
+  const hover = useChatStore((s) => s.hover);
+  const focus = useChatStore((s) => s.focus);
+  useEffect(() => {
+    if (!focus) return;
+    const present = focus.ids.filter((id) => rf.getNode(id));
+    if (!present.length) return;
+    rf.fitView({ nodes: present.map((id) => ({ id })), padding: 0.6, maxZoom: 0.9, duration: 450 });
+  }, [focus, rf]);
   const bubbles = useMemo(() => {
     const nodesOut: BubbleNodeType[] = []; const edgesOut: Edge[] = [];
     if (!inspectOn) return { nodesOut, edgesOut };
@@ -67,7 +75,7 @@ export function TreeCanvas() {
         const push = (msg: typeof m, pos: { x: number; y: number }) => {
           const id = `b:${cid}:${msg.seq}`;
           nodesOut.push({ id, type: "bubble", draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 5, position: pos,
-            data: { chatId: cid, seq: msg.seq, role: msg.role, color, text: msg.content, nodeIds: msg.node_ids, review: msg.review, label: first && shown.length > 1 ? chatLabel(c) + " · " + cid : null } });
+            data: { chatId: cid, seq: msg.seq, role: msg.role, color, text: msg.content, nodeIds: msg.node_ids, review: msg.review, label: first && shown.length > 1 ? chatLabel(c) + " · " + cid : null, hot: !!hover && hover.chatId === cid && (hover.seq == null || hover.seq === msg.seq) } });
           first = false;
           if (prev) edgesOut.push({ id: `t:${prev}:${id}`, source: prev, target: id, type: "thread", selectable: false, deletable: false, focusable: false, data: { color } });
           if (msg.role === "assistant") edgesOut.push({ id: `a:${id}`, source: id, sourceHandle: "anchor", target: sid, targetHandle: "anchor", type: "anchor", selectable: false, deletable: false, focusable: false, zIndex: 4 });
@@ -79,7 +87,7 @@ export function TreeCanvas() {
       }
     });
     return { nodesOut, edgesOut };
-  }, [inspectOn, chats, shown, doc.nodes, bubblePos, spread]);
+  }, [inspectOn, chats, shown, doc.nodes, bubblePos, spread, hover]);
   const squareOf = useCallback((bubbleKey: string) => {
     const [cid, seqS] = bubbleKey.split(":"); const seq = Number(seqS);
     const msgs = chats.find((c) => c.id === cid)?.messages ?? [];
