@@ -1,7 +1,8 @@
 "use client";
 import { memo, useCallback, useEffect, useRef } from "react";
 import { Handle, NodeResizer, Position, type NodeProps, type Node } from "@xyflow/react";
-import { useTreeStore } from "@/lib/store";
+import { useLock, useTreeStore } from "@/lib/store";
+import { LockNotice } from "@/components/LockNotice";
 import { ROOT_PLACEHOLDER } from "@/lib/seed";
 import { LinkPills } from "@/components/LinkPills";
 
@@ -17,15 +18,29 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
   const resizeNode = useTreeStore((s) => s.resizeNode);
   const addChild = useTreeStore((s) => s.addChild);
   const clearFocus = useTreeStore((s) => s.clearFocus);
+  const acquireLock = useTreeStore((s) => s.acquireLock);
+  const releaseLock = useTreeStore((s) => s.releaseLock);
+  const editor = useTreeStore((s) => s.peers.find((p) => p.editingNodeId === id)?.user ?? null);
+  const { lockedBy } = useLock(id);
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  // if someone else takes the square while we are typing in it, drop focus so the gray state shows
   useEffect(() => {
-    if (data.autoFocus) { setTimeout(() => ref.current?.focus(), 0); clearFocus(); }
+    if (lockedBy && document.activeElement === ref.current) ref.current?.blur();
+  }, [lockedBy]);
+
+  useEffect(() => {
+    if (data.autoFocus) { ref.current?.focus(); clearFocus(); }
   }, [data.autoFocus, clearFocus]);
 
   // Tab while typing in a square → new connected child below (and focus moves to it)
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); addChild(id); }
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      // leave this field first so fast keystrokes cannot land here while the child mounts
+      (e.target as HTMLTextAreaElement).blur();
+      addChild(id);
+    }
     else if (e.key === "Escape") (e.target as HTMLTextAreaElement).blur();
   }, [addChild, id]);
 
@@ -35,11 +50,14 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
 
   return (
     <div
-      style={{ width: width ?? 240, height: height ?? 120 }}
+      style={{ width: width ?? 240, height: height ?? 120, boxShadow: editor ? `0 0 0 3px ${editor.color}` : undefined }}
       className={`group relative flex flex-col rounded-md border-2 bg-white shadow-sm dark:bg-neutral-900 ${
         required ? "border-red-400" : data.isRoot ? "border-amber-500" : selected ? "border-sky-500" : "border-neutral-300 dark:border-neutral-600"
-      }`}
+      } ${lockedBy ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}
     >
+      {editor && (
+        <span style={{ background: editor.color }} className="absolute -top-5 right-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-white">{editor.name}</span>
+      )}
       <NodeResizer
         isVisible={!!selected}
         minWidth={120}
@@ -57,13 +75,17 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
         <span className="tracking-widest">⋮⋮⋮</span>
       </div>
 
+      {lockedBy && <LockNotice lock={lockedBy} className="px-2" />}
       <textarea
         ref={ref}
         value={data.text}
+        disabled={!!lockedBy}
+        onFocus={() => { if (!acquireLock(id)) ref.current?.blur(); }}
+        onBlur={() => releaseLock(id)}
         onChange={onChange}
         onKeyDown={onKeyDown}
         placeholder={data.isRoot ? ROOT_PLACEHOLDER : "Type an answer, question, or paste a link…"}
-        className="nodrag nowheel min-h-0 flex-1 resize-none bg-transparent px-2 pb-1 text-[14px] leading-snug outline-none placeholder:text-neutral-400"
+        className="nodrag nowheel min-h-0 flex-1 resize-none bg-transparent px-2 pb-1 text-[14px] leading-snug outline-none placeholder:text-neutral-400 disabled:cursor-not-allowed disabled:text-neutral-400"
         spellCheck={false}
       />
       <LinkPills text={data.text} onTextChange={(t) => updateText(id, t)} className="px-2 pb-2" />

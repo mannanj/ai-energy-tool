@@ -1,30 +1,46 @@
 "use client";
-import { create } from "zustand";
-import type { TreeDocument, TreeNode, TreeEdge, NodeId, EdgeId } from "@/types/tree";
-import { emptyDocument, exampleDocument, mkEdge, mkNode, NODE_H, NODE_W } from "./seed";
-
 /**
- * Single-user store. State lives in memory, mirrors to localStorage on every change,
- * and re-hydrates when another window (the pop-out panel) writes to localStorage.
- * In the multiplayer build this file is replaced by a Yjs/partyserver binding with the same API.
+ * Multiplayer store. State lives in a Yjs document synced through the TreeRoom Durable Object
+ * (partyserver). Zustand mirrors the Yjs maps into plain arrays for React, and every mutation
+ * writes back into Yjs. Awareness carries presence: user, cursor, and which square they are typing in.
+ *
+ * Yjs maps: meta {id,name,rootNodeId,...}, nodes {id -> TreeNode}, edges {id -> TreeEdge}, locks {nodeId -> NodeLock}
  */
+import { create } from "zustand";
+import * as Y from "yjs";
+import YProvider from "y-partyserver/provider";
+import { Awareness } from "y-protocols/awareness";
+import type { TreeDocument, TreeNode, TreeEdge, NodeId, EdgeId, NodeLock } from "@/types/tree";
+import { LOCK_TIMEOUT_MS } from "@/types/tree";
+import { exampleDocument, mkEdge, mkNode, NODE_H, NODE_W } from "./seed";
+import { fullName, partyHost, TREE_ID, type Me } from "./api";
 
-const STORAGE_KEY = "aet:doc:v1";
-const now = () => new Date().toISOString();
+export interface Peer {
+  clientId: number;
+  user: { id: string; name: string; color: string };
+  cursor: { x: number; y: number } | null;
+  editingNodeId: NodeId | null;
+}
 
 interface State {
   doc: TreeDocument;
+  /** first sync with the room finished */
   hydrated: boolean;
+  connected: boolean;
+  me: Me | null;
+  peers: Peer[];
+  locks: Record<NodeId, NodeLock>;
+  /** ticks every 10s so lock expiry re-renders */
+  now: number;
+
   selectedNodeId: NodeId | null;
   selectedEdgeId: EdgeId | null;
-  /** node whose textarea should grab focus once (set by addNode/addChild) */
   focusNodeId: NodeId | null;
   panelOpen: boolean;
-  panelWidth: number; // px
+  panelWidth: number;
   panelExpanded: boolean;
 
-  hydrate: () => void;
-  replaceDoc: (doc: TreeDocument) => void;
+  connect: (me: Me) => () => void;
   resetEmpty: () => void;
   loadExample: () => void;
 
@@ -34,10 +50,14 @@ interface State {
   moveNode: (id: NodeId, x: number, y: number) => void;
   resizeNode: (id: NodeId, width: number, height: number) => void;
   deleteNode: (id: NodeId) => void;
-
   addEdge: (source: NodeId, target: NodeId) => void;
   setEdgeLabel: (id: EdgeId, label: string) => void;
   deleteEdge: (id: EdgeId) => void;
+
+  acquireLock: (nodeId: NodeId) => boolean;
+  touchLock: (nodeId: NodeId) => void;
+  releaseLock: (nodeId: NodeId) => void;
+  setCursor: (pos: { x: number; y: number } | null) => void;
 
   select: (nodeId: NodeId | null, edgeId?: EdgeId | null) => void;
   clearFocus: () => void;
@@ -46,43 +66,56 @@ interface State {
   setPanelExpanded: (v: boolean) => void;
 }
 
-let lastWritten = "";
-function persist(doc: TreeDocument) {
-  if (typeof window === "undefined") return;
-  try {
-    const s = JSON.stringify(doc);
-    lastWritten = s;
-    localStorage.setItem(STORAGE_KEY, s);
-  } catch (e) {
-    console.error("persist failed", e);
-  }
-}
+const now = () => new Date().toISOString();
+const emptyDoc = (): TreeDocument => ({ version: 1, tree: { id: TREE_ID, name: "", rootNodeId: "", createdAt: "", updatedAt: "" }, nodes: [], edges: [] });
 
-function load(): TreeDocument | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if (!s || s === lastWritten) return null;
-    lastWritten = s;
-    const d = JSON.parse(s) as TreeDocument;
-    return d.version === 1 ? d : null;
-  } catch {
-    return null;
-  }
+// module-level Yjs handles (one room per window)
+let ydoc: Y.Doc | null = null;
+let provider: YProvider | null = null;
+let awareness: Awareness | null = null;
+const maps = () => {
+  if (!ydoc) throw new Error("not connected");
+  return { meta: ydoc.getMap<unknown>("meta"), nodes: ydoc.getMap<TreeNode>("nodes"), edges: ydoc.getMap<TreeEdge>("edges"), locks: ydoc.getMap<NodeLock>("locks") };
+};
+
+/** A lock counts only while fresh. */
+export function isLockActive(lock: NodeLock | undefined, at = Date.now()): lock is NodeLock {
+  return !!lock && at - Date.parse(lock.lastActivityAt) < LOCK_TIMEOUT_MS;
 }
 
 export const useTreeStore = create<State>((set, get) => {
-  const commit = (mut: (d: TreeDocument) => void) => {
-    const doc: TreeDocument = structuredClone(get().doc);
-    mut(doc);
-    doc.tree.updatedAt = now();
-    persist(doc);
-    set({ doc });
+  const readDoc = (): TreeDocument => {
+    const { meta, nodes, edges } = maps();
+    return {
+      version: 1,
+      tree: { id: TREE_ID, name: String(meta.get("name") ?? ""), rootNodeId: String(meta.get("rootNodeId") ?? ""), createdAt: String(meta.get("createdAt") ?? ""), updatedAt: String(meta.get("updatedAt") ?? "") },
+      nodes: [...nodes.values()],
+      edges: [...edges.values()],
+    };
+  };
+  const readLocks = () => Object.fromEntries(maps().locks.entries()) as Record<NodeId, NodeLock>;
+  const refresh = () => set({ doc: readDoc(), locks: readLocks() });
+  const tx = (fn: () => void) => { ydoc!.transact(fn, "local"); maps().meta.set("updatedAt", now()); };
+  const meId = () => get().me?.id;
+  const patchNode = (id: NodeId, patch: Partial<TreeNode>) => {
+    const { nodes } = maps();
+    const n = nodes.get(id);
+    if (!n) return;
+    tx(() => nodes.set(id, { ...n, ...patch, updatedAt: now(), updatedBy: meId() }));
+  };
+  const setLocalAwareness = (patch: Partial<Peer>) => {
+    if (!awareness) return;
+    awareness.setLocalState({ ...(awareness.getLocalState() ?? {}), ...patch });
   };
 
   return {
-    doc: emptyDocument(),
+    doc: emptyDoc(),
     hydrated: false,
+    connected: false,
+    me: null,
+    peers: [],
+    locks: {},
+    now: Date.now(),
     selectedNodeId: null,
     selectedEdgeId: null,
     focusNodeId: null,
@@ -90,17 +123,79 @@ export const useTreeStore = create<State>((set, get) => {
     panelWidth: 420,
     panelExpanded: false,
 
-    hydrate: () => {
-      const d = load();
-      if (d) set({ doc: d, hydrated: true });
-      else if (!get().hydrated) {
-        persist(get().doc);
-        set({ hydrated: true });
-      }
+    connect: (me) => {
+      if (provider) provider.destroy();
+      ydoc = new Y.Doc();
+      awareness = new Awareness(ydoc);
+      awareness.setLocalState({ user: { id: me.id, name: fullName(me), color: me.color }, cursor: null, editingNodeId: null });
+      provider = new YProvider(partyHost(), TREE_ID, ydoc, { party: "tree-room", awareness });
+      set({ me });
+
+      const { nodes, edges, meta, locks } = maps();
+      const onChange = () => refresh();
+      nodes.observe(onChange); edges.observe(onChange); meta.observe(onChange); locks.observe(onChange);
+      provider.on("sync", (synced: boolean) => { if (synced) { refresh(); set({ hydrated: true }); } });
+      provider.on("status", (e: { status: string }) => set({ connected: e.status === "connected" }));
+
+      const onAwareness = () => {
+        const states = awareness!.getStates();
+        const peers: Peer[] = [];
+        const present = new Set<string>();
+        for (const [clientId, s] of states) {
+          const st = s as Partial<Peer>;
+          if (!st.user) continue;
+          present.add(st.user.id);
+          if (clientId === awareness!.clientID || st.user.id === me.id) continue;
+          peers.push({ clientId, user: st.user, cursor: st.cursor ?? null, editingNodeId: st.editingNodeId ?? null });
+        }
+        set({ peers });
+        // release locks whose holder left (after a 10s grace so a reconnect does not drop a live lock)
+        if (get().hydrated) {
+          for (const [nodeId, lock] of locks.entries()) {
+            if (!present.has(lock.userId) && Date.now() - Date.parse(lock.lastActivityAt) > 10_000) tx(() => locks.delete(nodeId));
+          }
+        }
+      };
+      awareness.on("change", onAwareness);
+
+      const tick = setInterval(() => set({ now: Date.now() }), 10_000);
+      const onUnload = () => {
+        const id = meId();
+        for (const [nodeId, lock] of maps().locks.entries()) if (lock.userId === id) maps().locks.delete(nodeId);
+        awareness?.setLocalState(null);
+      };
+      window.addEventListener("beforeunload", onUnload);
+
+      return () => {
+        clearInterval(tick);
+        window.removeEventListener("beforeunload", onUnload);
+        onUnload();
+        provider?.destroy(); provider = null; awareness = null; ydoc?.destroy(); ydoc = null;
+        set({ hydrated: false, connected: false, peers: [] });
+      };
     },
-    replaceDoc: (doc) => { persist(doc); set({ doc, selectedNodeId: null, selectedEdgeId: null }); },
-    resetEmpty: () => get().replaceDoc(emptyDocument()),
-    loadExample: () => get().replaceDoc(exampleDocument()),
+
+    resetEmpty: () => {
+      const { nodes, edges, locks, meta } = maps();
+      const root = mkNode(TREE_ID, { x: 0, y: 0, isRoot: true, width: 360, height: 120 });
+      tx(() => {
+        nodes.clear(); edges.clear(); locks.clear();
+        nodes.set(root.id, root);
+        meta.set("rootNodeId", root.id); meta.set("name", "Rates went up");
+      });
+      set({ selectedNodeId: null, selectedEdgeId: null });
+    },
+    loadExample: () => {
+      const ex = exampleDocument();
+      const { nodes, edges, locks, meta } = maps();
+      tx(() => {
+        nodes.clear(); edges.clear(); locks.clear();
+        for (const n of ex.nodes) nodes.set(n.id, { ...n, treeId: TREE_ID });
+        for (const e of ex.edges) edges.set(e.id, { ...e, treeId: TREE_ID });
+        meta.set("rootNodeId", ex.tree.rootNodeId); meta.set("name", ex.tree.name);
+      });
+      set({ selectedNodeId: null, selectedEdgeId: null });
+    },
 
     addNode: (pos, text = "") => {
       const existing = get().doc.nodes;
@@ -108,62 +203,75 @@ export const useTreeStore = create<State>((set, get) => {
         existing.some((o) => x < o.x + o.width + 20 && x + NODE_W + 20 > o.x && y < o.y + o.height + 20 && y + NODE_H + 20 > o.y);
       let { x, y } = pos;
       for (let i = 0; i < 50 && overlaps(x, y); i++) y += NODE_H + 40;
-      const n = mkNode(get().doc.tree.id, { x, y, text, width: NODE_W, height: NODE_H });
-      commit((d) => { d.nodes.push(n); });
+      const n = mkNode(TREE_ID, { x, y, text, width: NODE_W, height: NODE_H, createdBy: meId(), updatedBy: meId() });
+      tx(() => maps().nodes.set(n.id, n));
       set({ selectedNodeId: n.id, selectedEdgeId: null, focusNodeId: n.id });
       return n.id;
     },
     addChild: (parentId, text = "") => {
-      const d0 = get().doc;
-      const parent = d0.nodes.find((n) => n.id === parentId);
+      const parent = get().doc.nodes.find((n) => n.id === parentId);
       if (!parent) return get().addNode({ x: 0, y: 0 }, text);
-      const siblings = d0.edges.filter((e) => e.source === parentId).length;
-      const n = mkNode(d0.tree.id, {
-        x: parent.x + siblings * (NODE_W + 40),
-        y: parent.y + parent.height + 100,
-        text,
-      });
-      const e = mkEdge(d0.tree.id, parentId, n.id);
-      commit((d) => { d.nodes.push(n); d.edges.push(e); });
+      const siblings = get().doc.edges.filter((e) => e.source === parentId).length;
+      const n = mkNode(TREE_ID, { x: parent.x + siblings * (NODE_W + 40), y: parent.y + parent.height + 100, text, createdBy: meId(), updatedBy: meId() });
+      const e = mkEdge(TREE_ID, parentId, n.id);
+      e.createdBy = meId();
+      tx(() => { maps().nodes.set(n.id, n); maps().edges.set(e.id, e); });
       set({ selectedNodeId: n.id, selectedEdgeId: null, focusNodeId: n.id });
       return n.id;
     },
-    updateNodeText: (id, text) =>
-      commit((d) => {
-        const n = d.nodes.find((x) => x.id === id);
-        if (n && n.text !== text) { n.text = text; n.updatedAt = now(); }
-      }),
-    moveNode: (id, x, y) =>
-      commit((d) => {
-        const n = d.nodes.find((x) => x.id === id);
-        if (n) { n.x = x; n.y = y; n.updatedAt = now(); }
-      }),
-    resizeNode: (id, width, height) =>
-      commit((d) => {
-        const n = d.nodes.find((x) => x.id === id);
-        if (n) { n.width = Math.round(width); n.height = Math.round(height); n.updatedAt = now(); }
-      }),
+    updateNodeText: (id, text) => { patchNode(id, { text }); get().touchLock(id); },
+    moveNode: (id, x, y) => patchNode(id, { x, y }),
+    resizeNode: (id, width, height) => patchNode(id, { width: Math.round(width), height: Math.round(height) }),
     deleteNode: (id) => {
-      if (get().doc.nodes.find((n) => n.id === id)?.isRoot) return; // root is required
-      commit((d) => {
-        d.nodes = d.nodes.filter((n) => n.id !== id);
-        d.edges = d.edges.filter((e) => e.source !== id && e.target !== id);
+      const { nodes, edges, locks } = maps();
+      if (nodes.get(id)?.isRoot) return;
+      if (isLockActive(locks.get(id)) && locks.get(id)!.userId !== meId()) return; // someone is typing in it
+      tx(() => {
+        nodes.delete(id); locks.delete(id);
+        for (const [eid, e] of edges.entries()) if (e.source === id || e.target === id) edges.delete(eid);
       });
       if (get().selectedNodeId === id) set({ selectedNodeId: null });
     },
 
     addEdge: (source, target) => {
       if (source === target) return;
-      const d0 = get().doc;
-      if (d0.edges.some((e) => e.source === source && e.target === target)) return;
-      commit((d) => { d.edges.push(mkEdge(d.tree.id, source, target)); });
+      if (get().doc.edges.some((e) => e.source === source && e.target === target)) return;
+      const e = mkEdge(TREE_ID, source, target); e.createdBy = meId();
+      tx(() => maps().edges.set(e.id, e));
     },
-    setEdgeLabel: (id, label) =>
-      commit((d) => {
-        const e = d.edges.find((x) => x.id === id);
-        if (e) e.label = label.trim() || undefined;
-      }),
-    deleteEdge: (id) => commit((d) => { d.edges = d.edges.filter((e) => e.id !== id); }),
+    setEdgeLabel: (id, label) => {
+      const { edges } = maps();
+      const e = edges.get(id);
+      if (e) tx(() => edges.set(id, { ...e, label: label.trim() || undefined }));
+    },
+    deleteEdge: (id) => tx(() => maps().edges.delete(id)),
+
+    /** Returns true if we now hold the lock. */
+    acquireLock: (nodeId) => {
+      const me = get().me; if (!me || !ydoc) return false;
+      const { locks } = maps();
+      const cur = locks.get(nodeId);
+      if (isLockActive(cur) && cur.userId !== me.id) return false;
+      const t = now();
+      tx(() => locks.set(nodeId, { nodeId, userId: me.id, userName: fullName(me), lockedAt: cur?.userId === me.id ? cur.lockedAt : t, lastActivityAt: t }));
+      setLocalAwareness({ editingNodeId: nodeId });
+      return true;
+    },
+    touchLock: (nodeId) => {
+      const me = get().me; if (!me || !ydoc) return;
+      const { locks } = maps();
+      const cur = locks.get(nodeId);
+      if (!cur || cur.userId !== me.id) return;
+      if (Date.now() - Date.parse(cur.lastActivityAt) < 3000) return; // throttle writes
+      tx(() => locks.set(nodeId, { ...cur, lastActivityAt: now() }));
+    },
+    releaseLock: (nodeId) => {
+      const me = get().me; if (!me || !ydoc) return;
+      const { locks } = maps();
+      if (locks.get(nodeId)?.userId === me.id) tx(() => locks.delete(nodeId));
+      setLocalAwareness({ editingNodeId: null });
+    },
+    setCursor: (pos) => setLocalAwareness({ cursor: pos }),
 
     select: (nodeId, edgeId = null) => set({ selectedNodeId: nodeId, selectedEdgeId: edgeId }),
     clearFocus: () => set({ focusNodeId: null }),
@@ -173,15 +281,18 @@ export const useTreeStore = create<State>((set, get) => {
   };
 });
 
-/** Call once per window: hydrate from localStorage and follow writes from other windows. */
-export function attachStorageSync() {
-  const s = useTreeStore.getState();
-  s.hydrate();
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) useTreeStore.getState().hydrate();
-  };
-  window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+/** Lock state for one square from the point of view of the current user. */
+export function useLock(nodeId: NodeId): { lockedBy: NodeLock | null; mine: boolean } {
+  const lock = useTreeStore((s) => s.locks[nodeId]);
+  const me = useTreeStore((s) => s.me);
+  const at = useTreeStore((s) => s.now);
+  const active = isLockActive(lock, Math.max(at, Date.now()));
+  if (!active) return { lockedBy: null, mine: false };
+  return lock.userId === me?.id ? { lockedBy: null, mine: true } : { lockedBy: lock, mine: false };
+}
+
+export function formatLockTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 export type { TreeNode, TreeEdge };

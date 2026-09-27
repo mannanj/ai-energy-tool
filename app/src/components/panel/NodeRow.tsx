@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import type { DerivedNode } from "@/types/tree";
-import { useTreeStore } from "@/lib/store";
+import { useLock, useTreeStore } from "@/lib/store";
+import { LockNotice } from "@/components/LockNotice";
 import { LinkPills } from "@/components/LinkPills";
 import { ROOT_PLACEHOLDER } from "@/lib/seed";
 
@@ -17,6 +18,9 @@ export function NodeRow({ d, dim }: { d: DerivedNode; dim?: boolean }) {
   const deleteNode = useTreeStore((s) => s.deleteNode);
   const select = useTreeStore((s) => s.select);
   const selected = useTreeStore((s) => s.selectedNodeId === d.node.id);
+  const acquireLock = useTreeStore((s) => s.acquireLock);
+  const releaseLock = useTreeStore((s) => s.releaseLock);
+  const { lockedBy } = useLock(d.node.id);
   const [copied, setCopied] = useState(false);
   const n = d.node;
 
@@ -38,16 +42,20 @@ export function NodeRow({ d, dim }: { d: DerivedNode; dim?: boolean }) {
           <button title="Copy text" onClick={(e) => { e.stopPropagation(); copy(); }} className="rounded px-1 hover:bg-neutral-100 dark:hover:bg-neutral-800">{copied ? "✓" : "copy"}</button>
           <button title="Add connected child" onClick={(e) => { e.stopPropagation(); addChild(n.id); }} className="rounded px-1 hover:bg-neutral-100 dark:hover:bg-neutral-800">+ child</button>
           {!n.isRoot && (
-            <button title="Delete square" onClick={(e) => { e.stopPropagation(); if (confirm("Delete this square and its arrows?")) deleteNode(n.id); }} className="rounded px-1 text-red-600 hover:bg-neutral-100 dark:hover:bg-neutral-800">del</button>
+            <button title="Delete square" disabled={!!lockedBy} onClick={(e) => { e.stopPropagation(); if (confirm("Delete this square and its arrows?")) deleteNode(n.id); }} className="rounded px-1 text-red-600 hover:bg-neutral-100 dark:hover:bg-neutral-800">del</button>
           )}
         </span>
       </div>
+      {lockedBy && <LockNotice lock={lockedBy} className="mb-1" />}
       <textarea
         value={n.text}
+        disabled={!!lockedBy}
+        onFocus={(e) => { if (!acquireLock(n.id)) e.currentTarget.blur(); }}
+        onBlur={() => releaseLock(n.id)}
         onChange={(e) => updateText(n.id, e.target.value)}
         placeholder={n.isRoot ? ROOT_PLACEHOLDER : "Type text. Paste links, they become pills below."}
         rows={Math.min(8, Math.max(2, Math.ceil(n.text.length / 60)))}
-        className={`w-full resize-y rounded border bg-white px-2 py-1 text-[13px] leading-snug outline-none focus:border-sky-400 dark:bg-neutral-900 ${n.isRoot && !n.text.trim() ? "border-red-300" : "border-neutral-200 dark:border-neutral-700"}`}
+        className={`w-full resize-y rounded border bg-white px-2 py-1 text-[13px] leading-snug outline-none focus:border-sky-400 disabled:bg-neutral-100 disabled:text-neutral-400 dark:bg-neutral-900 ${n.isRoot && !n.text.trim() ? "border-red-300" : "border-neutral-200 dark:border-neutral-700"}`}
         spellCheck={false}
       />
       <LinkPills text={n.text} onTextChange={(t) => updateText(n.id, t)} className="mt-1" />

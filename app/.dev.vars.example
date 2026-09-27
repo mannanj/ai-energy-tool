@@ -1,0 +1,5 @@
+WORKSPACE_PASSWORD=choose-a-shared-password
+SESSION_SECRET=long-random-string
+EMAIL_PROVIDER=console
+APP_ORIGIN=http://localhost:8971
+DEV_ORIGIN=http://localhost:3010

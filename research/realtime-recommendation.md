@@ -66,7 +66,10 @@ partyserver is the same API as a library inside our Worker.
 Idle rooms hibernate and cost nothing. A team of five editing for an hour is a few thousand DO
 requests and well under the included 1 million per month.
 
-## What is not built yet
+## Status 2026-09-27: built and live
 
-Multiplayer wiring in the app, password gate, magic link (Cloudflare Email Sending + D1, pattern
-already exists in `~/Documents/skeletons/signup-cloudflare`), tabs, file attachments.
+Everything above except tabs and files is deployed as Worker `ai-energy-tool`
+(https://ai-energy-tool.mannanteam.workers.dev). The app is a Next.js static export served by a
+hand-written Worker rather than OpenNext, so no wrapper is needed and the same Worker owns the gate,
+magic links, and the room. Live two-browser test passed: sync, cursors, editing lock both directions,
+pop-out panel, persistence across reload. See `app/README.md`.

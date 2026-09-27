@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
-  ReactFlow, Background, BackgroundVariant, MarkerType, MiniMap,
+  ReactFlow, Background, BackgroundVariant, MarkerType, MiniMap, useReactFlow,
   type Connection, type Edge, type EdgeChange, type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -11,6 +11,7 @@ import { SquareNode, type SquareNodeType } from "@/components/nodes/SquareNode";
 import { LabeledEdge } from "./LabeledEdge";
 import { Toolbar } from "./Toolbar";
 import { StatsBadge } from "./StatsBadge";
+import { Cursors } from "./Cursors";
 import { NODE_H, NODE_W } from "@/lib/seed";
 
 const nodeTypes = { square: SquareNode };
@@ -21,6 +22,17 @@ export function TreeCanvas() {
   const selectedNodeId = useTreeStore((s) => s.selectedNodeId);
   const selectedEdgeId = useTreeStore((s) => s.selectedEdgeId);
   const focusNodeId = useTreeStore((s) => s.focusNodeId);
+  const rf = useReactFlow();
+  const setCursor = useTreeStore((s) => s.setCursor);
+  const rafRef = useRef<number | null>(null);
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (rafRef.current) return;
+    const { clientX, clientY } = e;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      setCursor(rf.screenToFlowPosition({ x: clientX, y: clientY }));
+    });
+  }, [rf, setCursor]);
   const { moveNode, resizeNode, addEdge, select, addNode, addChild, deleteNode, deleteEdge } = useTreeStore.getState();
 
   const derived = useMemo(() => deriveTree(doc), [doc]);
@@ -117,6 +129,8 @@ export function TreeCanvas() {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onPaneClick={() => select(null, null)}
+      onPointerMove={onPointerMove}
+      onPointerLeave={() => setCursor(null)}
       fitView
       fitViewOptions={{ padding: 0.4, maxZoom: 1 }}
       minZoom={0.02}
@@ -136,6 +150,7 @@ export function TreeCanvas() {
       <MiniMap pannable zoomable className="!bottom-3 !right-3 !h-24 !w-40 opacity-80" nodeStrokeWidth={2} />
       <Toolbar />
       <StatsBadge />
+      <Cursors />
     </ReactFlow>
   );
 }

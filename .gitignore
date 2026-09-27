@@ -4,3 +4,8 @@ node_modules/
 !.env.example
 .DS_Store
 context/sources/_capture-tooling/node_modules/
+
+# local secrets
+.dev.vars
+.wrangler/
+out/
