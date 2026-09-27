@@ -8,14 +8,14 @@ const Avatar = ({ role, n }: { role: "user" | "assistant"; n: number }) => role 
   <span title="Resident" className="absolute -left-[34px] top-1.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#4a86e8] text-white">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
   </span>
-  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center text-[10px] font-semibold leading-none text-[#4a86e8]">#{n}</span>
+  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center leading-none text-[#4a86e8]"><span className="text-[9px]">#</span><span className="text-[17px] font-semibold">{n}</span></span>
   </>
 ) : (
   <>
   <span title="Helper" className="absolute -left-[34px] top-1.5 flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#e8842a] text-white">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h6"/></svg>
   </span>
-  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center text-[10px] font-semibold leading-none text-[#e8842a]">#{n}</span>
+  <span className="pointer-events-none absolute -left-[34px] top-[34px] w-[26px] text-center leading-none text-[#e8842a]"><span className="text-[9px]">#</span><span className="text-[17px] font-semibold">{n}</span></span>
   </>
 );
 

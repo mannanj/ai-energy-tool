@@ -8,18 +8,18 @@ export type BubbleNodeType = Node<BubbleData, "bubble">;
 
 const Human = ({ n }: { n: number }) => (
   <>
-  <span title="Resident" className="absolute -left-[30px] top-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#4a86e8] text-white">
+  <span title="Resident" className="absolute left-0 top-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#4a86e8] text-white">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
   </span>
-  <span className="pointer-events-none absolute -left-[30px] top-[26px] w-[22px] text-center text-[9px] font-semibold leading-none text-[#4a86e8]">#{n}</span>
+  <span className="pointer-events-none absolute left-0 top-[26px] w-[22px] text-center leading-none text-[#4a86e8]"><span className="text-[8px]">#</span><span className="text-[15px] font-semibold">{n}</span></span>
   </>
 );
 const Robot = ({ n }: { n: number }) => (
   <>
-  <span title="Helper" className="absolute -left-[30px] top-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#e8842a] text-white">
+  <span title="Helper" className="absolute left-0 top-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#e8842a] text-white">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h6"/></svg>
   </span>
-  <span className="pointer-events-none absolute -left-[30px] top-[26px] w-[22px] text-center text-[9px] font-semibold leading-none text-[#e8842a]">#{n}</span>
+  <span className="pointer-events-none absolute left-0 top-[26px] w-[22px] text-center leading-none text-[#e8842a]"><span className="text-[8px]">#</span><span className="text-[15px] font-semibold">{n}</span></span>
   </>
 );
 
@@ -47,11 +47,14 @@ export const BubbleNode = memo(function BubbleNode({ data }: NodeProps<BubbleNod
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none", left: 44 }} />
       <Handle type="source" id="anchor" position={Position.Left} style={{ opacity: 0, pointerEvents: "none", left: 30, top: "50%" }} />
       {data.label && <span className="ml-[30px] pl-2 text-[9px] font-semibold" style={{ color: data.color }}>Chat: {data.label}</span>}
+      <div className="relative">
+        {user ? <Human n={data.n} /> : <Robot n={data.n} />}
       <div title={user ? "Resident" : "square " + data.nodeIds.join(", ")}
         className={`nowheel relative ml-[30px] overflow-auto rounded-2xl border px-2 py-1.5 text-neutral-900 shadow-sm backdrop-blur-[2px] dark:text-neutral-100 ${data.hot ? "ring-2 ring-sky-400/50" : ""} ${user
           ? "max-h-[6.5em] rounded-br-sm border-[rgba(90,150,255,.35)] bg-gradient-to-br from-[rgba(90,150,255,.28)] to-[rgba(90,150,255,.12)]"
           : "max-h-[9em] rounded-bl-sm border-[rgba(255,150,60,.4)] bg-gradient-to-br from-[rgba(255,150,60,.30)] to-[rgba(255,150,60,.12)]"}`}>
-        {user ? <Human n={data.n} /> : <Robot n={data.n} />}<Rich text={data.text} />
+        <Rich text={data.text} />
+      </div>
       </div>
       {!user && (
         <div className="ml-[30px] pl-1">
