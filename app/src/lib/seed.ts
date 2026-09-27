@@ -8,6 +8,14 @@ export const TOP_LEVEL_QUESTION =
   "The rates for electricity have increased making it hard to make ends meet, what can I do?";
 
 const now = () => new Date().toISOString();
+const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+export function stableId(text: string, n = 10): string {
+  let h1 = 2166136261, h2 = 0x9747b28c;
+  for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 ^ c, 2246822519) >>> 0; }
+  let out = "";
+  for (let i = 0; i < n; i++) { const v = i % 2 ? h2 : h1; out += ALPHABET[(v >>> ((i >> 1) * 6)) % ALPHABET.length]; }
+  return out;
+}
 
 export function mkNode(treeId: string, partial: Partial<TreeNode> & { x: number; y: number }): TreeNode {
   const t = now();
@@ -90,5 +98,11 @@ export function exampleDocument(): TreeDocument {
     mkEdge(T, income.id, branches[5].id, "Either"),
     mkEdge(T, income.id, nothing.id),
   );
+  const seen = new Map<string, number>();
+  const ids = new Map<string, string>();
+  for (const n of doc.nodes) { const k = seen.get(n.text) ?? 0; seen.set(n.text, k + 1); ids.set(n.id, stableId(n.text + (k ? "#" + k : ""))); }
+  for (const n of doc.nodes) n.id = ids.get(n.id)!;
+  for (const e of doc.edges) { e.source = ids.get(e.source)!; e.target = ids.get(e.target)!; e.id = stableId(e.source + ">" + e.target + ":" + (e.label ?? "")); }
+  doc.tree.rootNodeId = ids.get(doc.tree.rootNodeId)!;
   return doc;
 }

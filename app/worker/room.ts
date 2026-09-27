@@ -2,6 +2,7 @@ import { Server } from "partyserver";
 import { withYjs } from "y-partyserver";
 import * as Y from "yjs";
 import type { TreeDocument, TreeNode, TreeEdge } from "../src/types/tree";
+import { exampleDocument } from "../src/lib/seed";
 
 export class TreeRoom extends withYjs(Server) {
   static options = { hibernate: true };
@@ -88,14 +89,14 @@ export class TreeRoom extends withYjs(Server) {
   }
 
   private seed() {
+    const doc = exampleDocument();
     const t = new Date().toISOString();
-    const rootId = crypto.randomUUID().slice(0, 10);
-    const root: TreeNode = { id: rootId, treeId: this.name, text: "", x: 0, y: 0, width: 360, height: 120, isRoot: true, createdAt: t, updatedAt: t };
     this.document.transact(() => {
       const meta = this.document.getMap("meta");
-      meta.set("id", this.name); meta.set("name", "Rates went up"); meta.set("rootNodeId", rootId);
+      meta.set("id", this.name); meta.set("name", doc.tree.name); meta.set("rootNodeId", doc.tree.rootNodeId);
       meta.set("createdAt", t); meta.set("updatedAt", t);
-      this.document.getMap("nodes").set(rootId, root);
+      for (const n of doc.nodes) this.document.getMap("nodes").set(n.id, { ...n, treeId: this.name });
+      for (const e of doc.edges) this.document.getMap("edges").set(e.id, { ...e, treeId: this.name });
     });
   }
 
