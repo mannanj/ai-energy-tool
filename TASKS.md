@@ -35,5 +35,5 @@ Every request from today, in order. Done items name the commit.
 
 ## To do
 
-17. Review the golden chats and propose how to make the resident experience useful; better answers; the tools needed.
+17. Golden chat review and proposal written: `docs/chat-experience-review.md`.
 23. Hover a chat or message in the panel: its bubbles on the canvas grow with a faint outline, and the same the other way from the canvas. Click jumps the canvas to it, zoomed out enough to see the squares around it.
