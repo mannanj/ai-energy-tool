@@ -4,9 +4,10 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
+  "alias": { "bun:sqlite": "./worker/bun-sqlite-stub.ts" },
   "assets": { "directory": "out", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "404-page" },
-  "durable_objects": { "bindings": [{ "name": "TreeRoom", "class_name": "TreeRoom" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TreeRoom"] }],
+  "durable_objects": { "bindings": [{ "name": "TreeRoom", "class_name": "TreeRoom" }, { "name": "ChatStore", "class_name": "ChatStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TreeRoom"] }, { "tag": "v2", "new_sqlite_classes": ["ChatStore"] }],
   "d1_databases": [{ "binding": "DB", "database_name": "ai-energy-tool", "database_id": "aada9a3e-f90e-480c-8b3c-3fbcb722e5ed", "migrations_dir": "migrations" }],
   "send_email": [{ "name": "EMAIL" }],
   "observability": { "enabled": true },
@@ -15,6 +16,9 @@
     "APP_NAME": "AI Energy Tool",
     "EMAIL_PROVIDER": "cloudflare",
     "EMAIL_FROM": "AI Energy Tool <no-reply@skeleton.mannan.is>",
-    "DEV_ORIGIN": ""
+    "DEV_ORIGIN": "",
+    "OPENROUTER_MODEL": "deepseek/deepseek-v4-flash",
+    "TYPESAFE_MODEL": "jev-latest",
+    "SIM_MODEL": "deepseek/deepseek-v4-flash"
   }
 }

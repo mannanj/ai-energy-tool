@@ -2,6 +2,7 @@ export interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
   TreeRoom: DurableObjectNamespace;
+  ChatStore: DurableObjectNamespace;
   EMAIL?: { send(msg: { to: string; from: { email: string; name?: string }; subject: string; text: string; html?: string }): Promise<void> };
   APP_ORIGIN: string;
   APP_NAME: string;
@@ -11,4 +12,9 @@ export interface Env {
   DEV_USER?: string;
   WORKSPACE_PASSWORD: string;
   SESSION_SECRET: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_MODEL?: string;
+  TYPESAFE_API_KEY?: string;
+  TYPESAFE_MODEL?: string;
+  SIM_MODEL?: string;
 }

@@ -1,49 +1,57 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { createHmac } from "node:crypto";
+import { hasHost, host } from "./host";
 
 export interface TreeNode { id: string; text: string; x: number; y: number; width: number; height: number; isRoot: boolean; }
 export interface TreeEdge { id: string; source: string; target: string; label?: string; }
 export interface TreeDocument { version: 1; tree: { id: string; name: string; rootNodeId: string; updatedAt: string }; nodes: TreeNode[]; edges: TreeEdge[]; }
 
-export const LIVE_PATH = resolve(import.meta.dir, "../data/tree.json");
-export const SEED_PATH = resolve(import.meta.dir, "../data/tree.seed.json");
+export const livePath = () => host().resolve(host().dir, "../data/tree.json");
+export const seedPath = () => host().resolve(host().dir, "../data/tree.seed.json");
 export const HOLE_REPLY = "I don't have a checked answer for this part yet. Call 2-1-1 (24/7) or visit 211virginia.org and a person there can find the right local help.";
 export const DECLINE_REPLY = "I can only help with one thing: electric bills for Dominion Energy customers in Fairfax County. For anything else, call 2-1-1 (24/7) or visit 211virginia.org.";
 
+let customSource: (() => Promise<TreeDocument>) | null = null;
+export function setTreeSource(fn: (() => Promise<TreeDocument>) | null): void { customSource = fn; workerCache = null; }
+
 function sessionSecret(): string | null {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
-  try {
-    const m = readFileSync(resolve(import.meta.dir, "../../app/.dev.vars"), "utf8").match(/^SESSION_SECRET=(.+)$/m);
-    return m ? m[1].trim().replace(/^"|"$/g, "") : null;
-  } catch { return null; }
+  const m = (hasHost() ? host().readFile(host().resolve(host().dir, "../../app/.dev.vars")) : null)?.match(/^SESSION_SECRET=(.+)$/m);
+  return m ? m[1].trim().replace(/^"|"$/g, "") : null;
 }
 export const workerOrigin = () => process.env.WORKER_ORIGIN || null;
-export const workerEnabled = () => !!workerOrigin() && !!sessionSecret() && !process.env.TREE_JSON;
+export const workerEnabled = () => !!customSource || (!!workerOrigin() && !!sessionSecret() && !process.env.TREE_JSON);
 
-const b64u = (buf: Buffer) => buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-function serviceCookie(): string {
+const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+async function serviceCookie(): Promise<string> {
   const secret = sessionSecret()!;
-  const sign = (p: object) => { const body = b64u(Buffer.from(JSON.stringify(p))); return `${body}.${b64u(createHmac("sha256", secret).update(body).digest())}`; };
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const exp = Math.floor(Date.now() / 1000) + 300;
-  return `aet_session=${sign({ id: "chat-server", firstName: "Chat", lastName: "Server", email: "chat@local", color: "#525252", exp })}`;
+  const body = b64u(new TextEncoder().encode(JSON.stringify({ id: "chat-server", firstName: "Chat", lastName: "Server", email: "chat@local", color: "#525252", exp })));
+  const sig = b64u(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body))));
+  return `aet_session=${body}.${sig}`;
 }
 
 let workerCache: { doc: TreeDocument; at: number } | null = null;
 export async function fetchWorkerTree(treeId = process.env.TREE_ID ?? "main"): Promise<TreeDocument> {
   if (workerCache && Date.now() - workerCache.at < 2000) return workerCache.doc;
-  const res = await fetch(`${workerOrigin()}/api/tree/${treeId}/export`, { headers: { cookie: serviceCookie() } });
-  if (!res.ok) throw new Error(`Worker ${res.status} on export`);
-  const doc = (await res.json()) as TreeDocument;
+  let doc: TreeDocument;
+  if (customSource) doc = await customSource();
+  else {
+    const res = await fetch(`${workerOrigin()}/api/tree/${treeId}/export`, { headers: { cookie: await serviceCookie() } });
+    if (!res.ok) throw new Error(`Worker ${res.status} on export`);
+    doc = (await res.json()) as TreeDocument;
+  }
   workerCache = { doc, at: Date.now() };
   return doc;
 }
 
-export const activePath = () => (process.env.TREE_JSON ? resolve(process.env.TREE_JSON) : LIVE_PATH);
+export const activePath = () => (process.env.TREE_JSON ? host().resolve(process.env.TREE_JSON) : livePath());
 
 export function loadTree(): { doc: TreeDocument; source: "live" | "seed"; path: string } {
-  const p = process.env.TREE_JSON ? resolve(process.env.TREE_JSON) : existsSync(LIVE_PATH) ? LIVE_PATH : SEED_PATH;
-  return { doc: JSON.parse(readFileSync(p, "utf8")), source: p === SEED_PATH ? "seed" : "live", path: p };
+  const h = host();
+  const p = process.env.TREE_JSON ? h.resolve(process.env.TREE_JSON) : h.exists(livePath()) ? livePath() : seedPath();
+  const text = h.readFile(p);
+  if (text == null) throw new Error("no tree file at " + p);
+  return { doc: JSON.parse(text), source: p === seedPath() ? "seed" : "live", path: p };
 }
 
 export const isHole = (n: TreeNode) => !n.text.trim();

@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 
-export const CHAT_ORIGIN = process.env.NEXT_PUBLIC_CHAT_ORIGIN || "http://localhost:8972";
+export const CHAT_ORIGIN = process.env.NEXT_PUBLIC_CHAT_ORIGIN ?? "http://localhost:8972";
 
 export interface Review { used: "written" | "verbatim"; code_ok: boolean; covers?: number; adds_nothing?: number; tone?: number; reason?: string }
 export interface ChatMessage { seq: number; role: "user" | "assistant"; content: string; node_ids: string[]; verbatim: string | null; review: Review | null }
@@ -46,7 +46,7 @@ interface State {
 }
 
 const jfetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-  const r = await fetch(CHAT_ORIGIN + path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
+  const r = await fetch(CHAT_ORIGIN + path, { ...init, credentials: "include", headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
   const j = (await r.json().catch(() => ({}))) as T & { error?: string };
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;

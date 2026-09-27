@@ -1,52 +1,43 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { db } from "./db";
+import { sql } from "./db";
 import { nanoid } from "./id";
 import { complete } from "./llm";
+import { DEFAULT_PROMPT } from "./default-prompt";
 
 export interface Prompt { id: string; title: string; text: string; created_at: string; active: number }
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
-const FILE = resolve(import.meta.dir, "../../context/system-prompt.md");
-
-db.run(`CREATE TABLE IF NOT EXISTS prompts (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  text TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  active INTEGER NOT NULL DEFAULT 0
-)`);
-
+let seeded = false;
 function seed(): void {
-  if (db.query("SELECT 1 FROM prompts LIMIT 1").get()) return;
-  let text = "";
-  try { text = readFileSync(FILE, "utf8"); } catch {}
-  db.query("INSERT INTO prompts (id, title, text, created_at, active) VALUES (?,?,?,?,1)").run(nanoid(10), "Original (system-prompt.md)", text, new Date().toISOString());
+  if (seeded) return;
+  seeded = true;
+  if (sql().get("SELECT 1 FROM prompts LIMIT 1")) return;
+  sql().run("INSERT INTO prompts (id, title, text, created_at, active) VALUES (?,?,?,?,1)", [nanoid(10), "Original (system-prompt.md)", DEFAULT_PROMPT, new Date().toISOString()]);
 }
-seed();
 
 export function listPrompts(): Prompt[] {
-  return db.query<Prompt, []>("SELECT * FROM prompts ORDER BY created_at DESC").all();
+  seed();
+  return sql().all<Prompt>("SELECT * FROM prompts ORDER BY created_at DESC");
 }
 export function activePrompt(): Prompt {
-  return db.query<Prompt, []>("SELECT * FROM prompts WHERE active = 1 LIMIT 1").get() ?? listPrompts()[0];
+  seed();
+  return sql().get<Prompt>("SELECT * FROM prompts WHERE active = 1 LIMIT 1") ?? listPrompts()[0];
 }
 export function activate(id: string): Prompt | null {
-  if (!db.query("SELECT 1 FROM prompts WHERE id = ?").get(id)) return null;
-  db.run("UPDATE prompts SET active = 0");
-  db.query("UPDATE prompts SET active = 1 WHERE id = ?").run(id);
+  if (!sql().get("SELECT 1 FROM prompts WHERE id = ?", [id])) return null;
+  sql().run("UPDATE prompts SET active = 0");
+  sql().run("UPDATE prompts SET active = 1 WHERE id = ?", [id]);
   return activePrompt();
 }
 export function rename(id: string, title: string): void {
-  db.query("UPDATE prompts SET title = ? WHERE id = ?").run(title.trim().slice(0, 80) || "Untitled", id);
+  sql().run("UPDATE prompts SET title = ? WHERE id = ?", [title.trim().slice(0, 80) || "Untitled", id]);
 }
 export async function savePrompt(text: string, title?: string): Promise<Prompt> {
   const prev = activePrompt();
   let t = (title ?? "").trim();
   if (!t) t = await nameFor(prev?.text ?? "", text);
   const id = nanoid(10);
-  db.run("UPDATE prompts SET active = 0");
-  db.query("INSERT INTO prompts (id, title, text, created_at, active) VALUES (?,?,?,?,1)").run(id, t, text, new Date().toISOString());
+  sql().run("UPDATE prompts SET active = 0");
+  sql().run("INSERT INTO prompts (id, title, text, created_at, active) VALUES (?,?,?,?,1)", [id, t, text, new Date().toISOString()]);
   return activePrompt();
 }
 

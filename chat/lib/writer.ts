@@ -98,7 +98,7 @@ export async function review(facts: string, written: string, kind: "step" | "ans
     } }),
   });
   if (!res.ok) return { used: "written", code_ok: true, reason: `reviewer error ${res.status}; code check only`, written, passed: true };
-  const a = (await res.json()).answers as Record<string, { noul: number }>;
+  const a = ((await res.json()) as { answers: Record<string, { noul: number }> }).answers;
   const covers = a.covers?.noul ?? 0, adds = a.adds_nothing?.noul ?? 0, tone = a.tone?.noul ?? 0, plain = a.plain?.noul ?? 1;
   const ok = covers >= 0.6 && adds >= 0.6 && tone >= 0.5 && plain >= 0.5;
   return { used: ok ? "written" : "verbatim", code_ok: true, covers, adds_nothing: adds, tone, plain, reason: ok ? undefined : `review under the bar (covers ${covers.toFixed(2)}, adds_nothing ${adds.toFixed(2)}, tone ${tone.toFixed(2)}, plain ${plain.toFixed(2)})`, written, passed: ok };

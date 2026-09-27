@@ -3,6 +3,7 @@ import type { Env } from "./env";
 import { clearCookie, consumeLoginToken, createLoginToken, gateCookie, getSession, hasGate, passwordMatches, sessionCookie, upsertUser, SESSION_COOKIE, GATE_COOKIE } from "./auth";
 import { sendMagicLink } from "./email";
 export { TreeRoom } from "./room";
+export { ChatStore } from "./chat";
 
 const json = (data: unknown, init: ResponseInit = {}) => Response.json(data, init);
 
@@ -17,11 +18,19 @@ function cors(req: Request, env: Env, res: Response): Response {
   return new Response(res.body, { status: res.status, headers: h });
 }
 
+const isChatApi = (path: string) => path === "/api/chat" || path === "/api/tree" || path.startsWith("/api/chats") || path.startsWith("/api/admin/");
+const chatStore = (env: Env) => env.ChatStore.get(env.ChatStore.idFromName("main"));
+
 async function api(req: Request, env: Env, url: URL): Promise<Response> {
   const secure = url.protocol === "https:";
   const path = url.pathname;
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+
+  if (isChatApi(path)) {
+    if (!(await getSession(req, env))) return json({ error: "session" }, { status: 401 });
+    return chatStore(env).fetch(req);
+  }
 
   if (path === "/api/me" && req.method === "GET") {
     const gate = await hasGate(req, env);
@@ -108,6 +117,10 @@ export default {
       else if (path === "/signin") { if (!gate) return Response.redirect(new URL("/gate", url).toString(), 302); if (session) return Response.redirect(new URL("/", url).toString(), 302); }
       else if (!gate) return Response.redirect(new URL("/gate", url).toString(), 302);
       else if (!session) return Response.redirect(new URL("/signin", url).toString(), 302);
+      if (session && (path.startsWith("/c/") || path === "/chats")) {
+        const file = path === "/chats" ? "/chat/chats.html" : "/chat/index.html";
+        return env.ASSETS.fetch(new Request(new URL(file, url).toString(), req));
+      }
     }
     return env.ASSETS.fetch(req);
   },

@@ -205,7 +205,7 @@ export function TreeCanvas() {
       className="bg-neutral-50 dark:bg-neutral-950"
       style={{ ["--xy-node-border-default" as string]: "transparent" }}
     >
-      <Background variant={BackgroundVariant.Lines} gap={24} lineWidth={0.5} color="rgba(128,128,128,0.12)" />
+      <Background variant={BackgroundVariant.Lines} gap={24} lineWidth={1} color="rgba(128,128,128,0.28)" />
       <MiniMap pannable zoomable className="!bottom-3 !right-3 !h-24 !w-40 opacity-80" nodeStrokeWidth={2} />
       <Toolbar />
       <StatsBadge />

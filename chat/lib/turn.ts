@@ -4,6 +4,7 @@ export type Reader = (text: string, said: string, options: Option[], first: bool
 import { writeReviewed, type Draft, type Review } from "./writer";
 import { activePrompt } from "./prompts";
 import { DECLINE_REPLY, HOLE_REPLY, Tree, fetchWorkerTree, isHole, loadTree, workerEnabled, type TreeNode } from "./tree";
+import { host } from "./host";
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 export const READER = readerName;
@@ -12,7 +13,7 @@ let cached: { tree: Tree; source: string; path: string; mtime: number } | null =
 export function tree(): Tree {
   if (workerEnabled() && cached?.source === "worker") return cached.tree;
   const { doc, source, path } = loadTree();
-  const mtime = Bun.file(path).lastModified;
+  const mtime = host().mtime(path);
   if (!cached || cached.path !== path || cached.mtime !== mtime) cached = { tree: new Tree(doc), source, path, mtime };
   return cached.tree;
 }

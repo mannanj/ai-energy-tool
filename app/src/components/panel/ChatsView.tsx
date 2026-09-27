@@ -34,7 +34,7 @@ export function ChatsView() {
   useEffect(() => { load(); }, [load]);
   const c: Chat | undefined = chats.find((x) => x.id === current);
 
-  if (!reachable) return <div className="p-3 text-[12px] text-neutral-600 dark:text-neutral-300">The chat server is not reachable at <code>{CHAT_ORIGIN}</code>. Start it with <code>cd chat &amp;&amp; bun server.ts</code>. {error && <div className="mt-1 text-red-600">{error}</div>}</div>;
+  if (!reachable) return <div className="p-3 text-[12px] text-neutral-600 dark:text-neutral-300">The chat backend did not answer{CHAT_ORIGIN ? <> at <code>{CHAT_ORIGIN}</code></> : ""}. {error && <div className="mt-1 text-red-600">{error}</div>}</div>;
 
   if (c) {
     return (

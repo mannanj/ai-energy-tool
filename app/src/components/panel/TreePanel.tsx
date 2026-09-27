@@ -25,6 +25,7 @@ export function TreePanel({ popout = false }: Props) {
   const [draft, setDraft] = useState("");
   const [attach, setAttach] = useState(true);
   const view = useTreeStore((s) => s.panelView);
+  const setView = useTreeStore((s) => s.setPanelView);
 
   const derived = useMemo(() => deriveTree(doc), [doc]);
   const list = useMemo(() => orderedNodes(derived, doc.tree.rootNodeId), [derived, doc.tree.rootNodeId]);
@@ -72,7 +73,11 @@ export function TreePanel({ popout = false }: Props) {
       )}
 
       <div className="flex items-center gap-1 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
-        <span className="text-[13px] font-medium">{view === "chats" ? "Chats" : view === "history" ? "History" : "Squares"}</span>
+        <span className="flex rounded border border-neutral-200 text-[12px] dark:border-neutral-700">
+          {(["chats", "tree", "history"] as const).map((v) => (
+            <button key={v} onClick={() => setView(v)} className={`px-2.5 py-0.5 ${view === v ? "bg-neutral-100 font-medium dark:bg-neutral-800" : ""}`}>{v === "chats" ? "Chat" : v === "tree" ? "Tree" : "History"}</button>
+          ))}
+        </span>
         {!popout && (
           <span className="ml-auto flex items-center gap-0.5">
             <button title={expanded ? "Restore width" : "Expand to full width"} onClick={() => setPanelExpanded(!expanded)} className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">

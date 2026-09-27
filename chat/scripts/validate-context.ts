@@ -1,4 +1,4 @@
-import { db, getMessages, listChats } from "../lib/db";
+import { getMessages, listChats } from "../lib/db";
 import { fetchWorkerTree, workerEnabled, HOLE_REPLY, DECLINE_REPLY } from "../lib/tree";
 import { codeCheck } from "../lib/writer";
 
@@ -29,5 +29,4 @@ for (const c of listChats({ sharedOnly: false })) {
   console.log(`ok   ${c.scenario} ${c.id}: ${msgs.filter((m) => m.role === "assistant").length} replies traced to live squares`);
 }
 console.log(`${checks} checks, ${fails} failures`);
-db.close();
 process.exit(fails ? 1 : 0);
