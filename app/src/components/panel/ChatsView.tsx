@@ -14,11 +14,22 @@ const Avatar = ({ role }: { role: "user" | "assistant" }) => role === "user" ? (
 );
 
 export function ChatsView() {
-  const { chats, shown, current, busy, error, reachable, showArchived } = useChatStore();
-  const { load, select, showAll, rerun, send, setShowArchived, archive } = useChatStore.getState();
+  const { chats, shown, current, busy, error, reachable } = useChatStore();
+  const { load, select, showAll, rerun, send, archive } = useChatStore.getState();
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState("");
   const start = () => { const t = draft.trim(); if (!t || busy) return; setDraft(""); send(null, t); };
+  const prompts = useChatStore((s) => s.prompts);
+  const activeId = useChatStore((s) => s.activePrompt);
+  const { loadPrompts, savePrompt, activatePrompt, renamePrompt } = useChatStore.getState();
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [promptText, setPromptText] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  useEffect(() => { if (promptOpen && !prompts.length) loadPrompts(); }, [promptOpen, prompts.length, loadPrompts]);
+  const picked = prompts.find((x) => x.id === (pickedId ?? activeId)) ?? prompts[0];
+  const text = promptText ?? picked?.text ?? "";
+  const dirty = !!picked && text !== picked.text;
   const answer = (id: string) => { const t = reply.trim(); if (!t || busy) return; setReply(""); send(id, t); };
   useEffect(() => { load(); }, [load]);
   const c: Chat | undefined = chats.find((x) => x.id === current);
@@ -68,21 +79,36 @@ export function ChatsView() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
+        <button type="button" onClick={() => setPromptOpen(!promptOpen)} className="flex items-center gap-1 text-[12px] text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white">
+          <span className={`inline-block transition-transform ${promptOpen ? "rotate-90" : ""}`}>▸</span> System prompt{picked && <span className="text-neutral-400"> · {picked.title}</span>}
+        </button>
+        {promptOpen && picked && (
+          <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-700 dark:bg-neutral-800/60">
+            <select value={picked.id} onChange={(e) => { setPickedId(e.target.value); setPromptText(null); setTitleDraft(null); }} className="w-full rounded border border-neutral-200 bg-white px-2 py-1 text-[12px] dark:border-neutral-700 dark:bg-neutral-900">
+              {prompts.map((x) => <option key={x.id} value={x.id}>{x.title}{x.id === activeId ? " (in use)" : ""} · {new Date(x.created_at).toLocaleString()}</option>)}
+            </select>
+            <input value={titleDraft ?? picked.title} onChange={(e) => setTitleDraft(e.target.value)} onBlur={() => { if (titleDraft != null && titleDraft.trim() && titleDraft !== picked.title) renamePrompt(picked.id, titleDraft); setTitleDraft(null); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} title="Title of this version, click to edit" className="mt-1.5 w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[12px] font-medium hover:border-neutral-200 focus:border-sky-400 focus:bg-white focus:outline-none dark:hover:border-neutral-700 dark:focus:bg-neutral-900" />
+            <textarea value={text} onChange={(e) => setPromptText(e.target.value)} rows={14} spellCheck={false} className="mt-1 w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-snug outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
+            <div className="mt-1.5 flex items-center gap-2">
+              <button type="button" disabled={!dirty || !!busy} onClick={async () => { await savePrompt(text); setPromptText(null); setPickedId(null); }} className="rounded bg-emerald-700 px-3 py-1 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">Save as new version</button>
+              {picked.id !== activeId && !dirty && <button type="button" disabled={!!busy} onClick={() => activatePrompt(picked.id)} className="rounded border border-neutral-300 px-3 py-1 text-[12px] hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800">Use this version</button>}
+              {dirty && <button type="button" onClick={() => setPromptText(null)} className="text-[12px] text-neutral-500 underline">discard</button>}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="border-b border-neutral-200 p-3 dark:border-neutral-700">
         <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/60">
-          <div className="text-[13px] font-medium">New chat</div>
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); start(); } }} rows={3} placeholder="Type your first message" className="mt-2 w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
-          <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 w-full rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Starting…" : "Start chat"}</button>
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); start(); } }} rows={3} placeholder="Start a new chat: write your first message here" className="w-full resize-y rounded border border-neutral-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-sky-400 dark:border-neutral-700 dark:bg-neutral-900" />
+          <button type="button" disabled={!!busy || !draft.trim()} onClick={start} className="mt-2 w-full rounded bg-emerald-700 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? "Starting…" : "Start new chat"}</button>
         </div>
       </div>
-      <div className="flex items-center gap-2 px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">
-        Chats <span className="normal-case tracking-normal">{chats.length}</span>
-        <label className="ml-auto flex items-center gap-1 normal-case tracking-normal"><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> archived</label>
-      </div>
+      <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">History ({chats.length})</div>
       <ul className="flex-1">
         {chats.map((x) => (
           <li key={x.id} onClick={() => select(x.id)} className="cursor-pointer border-t border-neutral-200 px-3 py-2 text-[13px] hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
             <div className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: chatColor(shown, x.id) }} />{chatLabel(x)}</div>
-            <div className="text-[11px] text-neutral-500">{[x.source + (x.parent_id ? ` of ${x.parent_id}@${x.parent_seq}` : ""), x.status, Math.floor(x.message_count / 2) + " turns", new Date(x.created_at).toLocaleString(), x.archived ? "archived" : ""].filter(Boolean).join(" · ")}</div>
+            <div className="text-[11px] text-neutral-500">{[x.source + (x.parent_id ? ` of ${x.parent_id}@${x.parent_seq}` : ""), x.status, Math.floor(x.message_count / 2) + " turns", new Date(x.created_at).toLocaleString()].filter(Boolean).join(" · ")}</div>
           </li>
         ))}
       </ul>

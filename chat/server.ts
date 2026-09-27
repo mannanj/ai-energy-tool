@@ -1,4 +1,5 @@
 import { archiveAllBut, getChat, getMessages, listChats, setArchived, shareChat, transcript } from "./lib/db";
+import { activate, activePrompt, listPrompts, rename, savePrompt } from "./lib/prompts";
 import { runTurn, READER, ensureTree, tree, treeSource } from "./lib/turn";
 import { isHole, validate, activePath } from "./lib/tree";
 import { SCENARIOS, rerunFrom, runScenario, continueChat } from "./scripts/simulate";
@@ -60,6 +61,18 @@ async function route(req: Request): Promise<Response> {
       if (v.errors.length) return json({ error: v.errors.join("; "), warnings: v.warnings }, 400);
       writeFileSync(activePath(), JSON.stringify(doc, null, 2));
       const T = tree(); return json({ ok: true, source: treeSource(), report: T.report(), warnings: v.warnings, updatedAt: T.doc.tree.updatedAt });
+    }
+    if (p === "/api/admin/prompts" && req.method === "GET") return json({ active: activePrompt().id, versions: listPrompts() });
+    if (p === "/api/admin/prompts" && req.method === "POST") {
+      const b = await req.json().catch(() => ({})) as { text?: string; title?: string };
+      if (!b.text?.trim()) return json({ error: "text required" }, 400);
+      try { return json(await savePrompt(b.text, b.title)); } catch (e) { return json({ error: (e as Error).message }, 502); }
+    }
+    let pm = p.match(/^\/api\/admin\/prompts\/([A-Za-z0-9_-]+)\/(activate|rename)$/);
+    if (pm && req.method === "POST") {
+      const b = await req.json().catch(() => ({})) as { title?: string };
+      if (pm[2] === "rename") { rename(pm[1], b.title ?? ""); return json({ ok: true }); }
+      const a = activate(pm[1]); return a ? json(a) : json({ error: "Not found" }, 404);
     }
     if (p === "/api/admin/scenarios") return json(SCENARIOS.map((s) => ({ name: s.name, opener: s.opener })));
     if (p === "/api/admin/new" && req.method === "POST") {

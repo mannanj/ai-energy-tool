@@ -2,6 +2,7 @@ import { addMessage, createChat, getChat, getMessages, getState, setState, type 
 import { read as defaultRead, readerName, translate, type Read, type Option } from "./judge";
 export type Reader = (text: string, said: string, options: Option[], first: boolean) => Promise<Read>;
 import { writeReviewed, type Draft, type Review } from "./writer";
+import { activePrompt } from "./prompts";
 import { DECLINE_REPLY, HOLE_REPLY, Tree, fetchWorkerTree, isHole, loadTree, workerEnabled, type TreeNode } from "./tree";
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
@@ -39,7 +40,7 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
   const read = opts.reader ?? defaultRead;
   const T = await ensureTree();
   let chat: Chat | null = chatId ? getChat(chatId) : null;
-  if (!chat) chat = createChat({ model: MODEL, systemPrompt: `tree ${T.doc.tree.id} updated ${T.doc.tree.updatedAt} (${treeSource()}); reader ${READER()}; writer ${MODEL}`, source: opts.source, scenario: opts.scenario, parentId: opts.parentId, parentSeq: opts.parentSeq, treeUpdatedAt: T.doc.tree.updatedAt });
+  if (!chat) chat = createChat({ model: MODEL, systemPrompt: `tree ${T.doc.tree.id} updated ${T.doc.tree.updatedAt} (${treeSource()}); reader ${READER()}; writer ${MODEL}; prompt ${activePrompt().id} ${activePrompt().title}`, source: opts.source, scenario: opts.scenario, parentId: opts.parentId, parentSeq: opts.parentSeq, treeUpdatedAt: T.doc.tree.updatedAt });
   const s: State = { nodeId: null, path: [], done: false, ...getState<Partial<State>>(chat.id) };
   if (!Array.isArray(s.path)) s.path = [];
   addMessage(chat.id, "user", text);

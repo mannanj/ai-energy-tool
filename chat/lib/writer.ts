@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { complete, type ChatMessage } from "./llm";
+import { activePrompt } from "./prompts";
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
-const RULES = (() => { try { return readFileSync(resolve(import.meta.dir, "../../context/system-prompt.md"), "utf8"); } catch { return ""; } })();
 const API = "https://api.typesafe.ai/v1/systemone";
 
 export interface Review { used: "written" | "verbatim"; code_ok: boolean; covers?: number; adds_nothing?: number; tone?: number; plain?: number; reason?: string; written?: string; attempts?: number; passed?: boolean; simplified?: boolean }
@@ -27,7 +25,7 @@ export function codeCheck(facts: string, reply: string, conversation: string): {
 
 export async function write(facts: string, history: ChatMessage[], kind: "step" | "answer" | "decline", feedback = ""): Promise<string> {
   const sys = [
-    RULES.trim(),
+    activePrompt().text.trim(),
     "",
     "## This turn",
     "You are given FACTS: the exact text of the square in the decision tree the conversation has reached. Write the helper's next message from it.",

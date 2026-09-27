@@ -11,6 +11,7 @@ export interface Chat {
   state: { ended_reason?: string; path?: string[] }; messages: ChatMessage[];
 }
 export interface Scenario { name: string; opener: string }
+export interface Prompt { id: string; title: string; text: string; created_at: string; active: number }
 
 export const CHAT_COLORS = ["#1f5f3f", "#8a4b9c", "#b9651a", "#1f4f8a", "#a33", "#3a7d7d"];
 
@@ -35,6 +36,12 @@ interface State {
   rerun: (id: string, seq: number) => Promise<void>;
   runScenario: (name: string) => Promise<void>;
   send: (chatId: string | null, message: string) => Promise<void>;
+  prompts: Prompt[];
+  activePrompt: string | null;
+  loadPrompts: () => Promise<void>;
+  savePrompt: (text: string, title?: string) => Promise<void>;
+  activatePrompt: (id: string) => Promise<void>;
+  renamePrompt: (id: string, title: string) => Promise<void>;
   archive: (id: string, archived: boolean) => Promise<void>;
 }
 
@@ -85,6 +92,25 @@ export const useChatStore = create<State>((set, get) => ({
     try { const j = await jfetch<{ chatId: string }>("/api/chat", { method: "POST", body: JSON.stringify({ chatId, message }) }); await get().load(); get().select(j.chatId, !!chatId); }
     catch (e) { set({ error: (e as Error).message }); }
     finally { set({ busy: null }); }
+  },
+  prompts: [], activePrompt: null,
+  loadPrompts: async () => {
+    try { const j = await jfetch<{ active: string; versions: Prompt[] }>("/api/admin/prompts"); set({ prompts: j.versions, activePrompt: j.active }); }
+    catch (e) { set({ error: (e as Error).message }); }
+  },
+  savePrompt: async (text, title) => {
+    set({ busy: "saving prompt", error: null });
+    try { await jfetch("/api/admin/prompts", { method: "POST", body: JSON.stringify({ text, title }) }); await get().loadPrompts(); }
+    catch (e) { set({ error: (e as Error).message }); }
+    finally { set({ busy: null }); }
+  },
+  activatePrompt: async (id) => {
+    try { await jfetch(`/api/admin/prompts/${id}/activate`, { method: "POST", body: "{}" }); await get().loadPrompts(); }
+    catch (e) { set({ error: (e as Error).message }); }
+  },
+  renamePrompt: async (id, title) => {
+    try { await jfetch(`/api/admin/prompts/${id}/rename`, { method: "POST", body: JSON.stringify({ title }) }); await get().loadPrompts(); }
+    catch (e) { set({ error: (e as Error).message }); }
   },
   archive: async (id, archived) => { await jfetch("/api/admin/archive", { method: "POST", body: JSON.stringify({ id, archived }) }); await get().load(); },
 }));
