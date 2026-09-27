@@ -29,10 +29,12 @@
   .panel .head { display: flex; align-items: center; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
   .panel.chatmode .head .t, .panel.chatmode .head .sub, .panel.chatmode .section { display: none; }
   .panel:not(.chatmode) .chat, .panel:not(.chatmode) .back { display: none; }
-  .panel.chatmode .head { position: absolute; top: 0; right: 0; border: 0; background: transparent; z-index: 3; }
-  .panel .back { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 13px; text-decoration: none; padding: 4px 8px; border-radius: 8px; background: color-mix(in srgb, var(--panel) 92%, transparent); }
+  .panel.chatmode .head { position: absolute; top: 6px; right: 6px; border: 0; padding: 2px; z-index: 3; background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(6px); border-radius: 10px; box-shadow: 0 1px 6px #0003; }
+  .panel .back { position: absolute; left: 8px; top: 8px; z-index: 3; font-size: 12px; text-decoration: none; padding: 4px 9px; border-radius: 10px; background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(6px); box-shadow: 0 1px 6px #0003; }
   .panel .back:hover { background: var(--bg); }
-  .panel.chatmode .chat { padding-top: 40px; height: 100%; }
+  .panel.chatmode .chat { padding-top: 0; height: 100%; }
+  .chat .meta { position: sticky; top: 0; z-index: 2; margin: 0; padding: 40px 12px 6px; background: linear-gradient(var(--panel) 70%, transparent); font-size: 11px; }
+  .chat .meta:hover { white-space: normal; }
   .panel .head .t { font-weight: 600; }
   .panel .head .sub { color: var(--muted); font-size: 11px; margin-left: 4px; }
   .panel .head .right { margin-left: auto; display: flex; gap: 2px; }
@@ -50,7 +52,7 @@
   .list li.active { background: var(--user); }
   .list li .m { color: var(--muted); font-size: 11px; }
   .chat { flex: 1; overflow: auto; }
-  .chat .meta { margin: 10px 12px 4px; font-size: 12px; color: var(--muted); }
+  .chat .meta { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chat .msg { margin: 8px 12px; }
   .chat .msg { justify-content: flex-start; }
   .chat .bubble { position: relative; width: calc(100% - 34px); max-width: none; margin-left: 34px; font-size: 13px; padding: 8px 10px; }
