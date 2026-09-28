@@ -2,14 +2,14 @@ import { Server } from "partyserver";
 import { withYjs } from "y-partyserver";
 import * as Y from "yjs";
 import type { TreeDocument, TreeNode, TreeEdge } from "../src/types/tree";
-import { exampleDocument } from "../src/lib/seed";
+import { emptyDocument, exampleDocument } from "../src/lib/seed";
+import { civicSignalDocument } from "../src/lib/seed-civic-signal";
 
 export class TreeRoom extends withYjs(Server) {
   static options = { hibernate: true };
   static callbackOptions = { debounceWait: 400, debounceMaxWait: 2000, timeout: 5000 };
 
   static AUTO_SNAPSHOT_MS = 60_000;
-  static KEEP_VERSIONS = 500;
 
   async onLoad() {
     this.ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS tree_docs (id TEXT PRIMARY KEY, data BLOB NOT NULL, updated_at TEXT NOT NULL)");
@@ -20,7 +20,7 @@ export class TreeRoom extends withYjs(Server) {
     if (rows.length) {
       Y.applyUpdate(this.document, new Uint8Array(rows[0].data as ArrayBuffer));
     }
-    if (!this.document.getMap("meta").get("rootNodeId")) this.seed();
+    if (!this.document.getMap("meta").get("rootNodeId")) this.seed(this.name === "main" ? exampleDocument() : emptyDocument(""));
   }
 
   async onSave() {
@@ -53,11 +53,7 @@ export class TreeRoom extends withYjs(Server) {
       "INSERT INTO versions (created_at, label, author, node_count, edge_count, hash, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
       new Date().toISOString(), label, author, doc.nodes.length, doc.edges.length, hash, JSON.stringify(doc),
     );
-    const n = this.lastVersion()!.n;
-    this.ctx.storage.sql.exec(
-      "DELETE FROM versions WHERE label = 'auto' AND n NOT IN (SELECT n FROM versions ORDER BY n DESC LIMIT ?)", TreeRoom.KEEP_VERSIONS,
-    );
-    return n;
+    return this.lastVersion()!.n;
   }
 
   private snapshotIfDue() {
@@ -88,8 +84,7 @@ export class TreeRoom extends withYjs(Server) {
     }, "restore");
   }
 
-  private seed() {
-    const doc = exampleDocument();
+  private seed(doc: TreeDocument) {
     const t = new Date().toISOString();
     this.document.transact(() => {
       const meta = this.document.getMap("meta");
@@ -122,6 +117,15 @@ export class TreeRoom extends withYjs(Server) {
     if (one && req.method === "GET" && !one[2]) {
       const v = this.getVersion(Number(one[1]));
       return v ? Response.json(v) : Response.json({ error: "not found" }, { status: 404 });
+    }
+    if (req.method === "POST" && path === "/init") {
+      const body = (await req.json().catch(() => ({}))) as { name?: string; seed?: string };
+      const doc = body.seed === "civic-signal" ? civicSignalDocument() : body.seed === "example" ? exampleDocument() : emptyDocument("");
+      doc.tree.name = (body.name ?? "").trim() || doc.tree.name;
+      this.restore(doc);
+      this.document.getMap("meta").set("createdAt", new Date().toISOString());
+      const n = this.saveVersion("created", author, true);
+      return Response.json({ ok: true, n });
     }
     if (req.method === "POST" && path === "/versions") {
       const body = (await req.json().catch(() => ({}))) as { label?: string };

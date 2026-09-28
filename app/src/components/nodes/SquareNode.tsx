@@ -6,7 +6,7 @@ import { LockNotice } from "@/components/LockNotice";
 import { ROOT_PLACEHOLDER } from "@/lib/seed";
 import { LinkPills } from "@/components/LinkPills";
 
-export type SquareData = { text: string; isRoot: boolean; number: string; autoFocus?: boolean; onPath?: boolean; hole?: boolean };
+export type SquareData = { text: string; isRoot: boolean; number: string; autoFocus?: boolean; onPath?: boolean; hole?: boolean; sourceCount?: number };
 export type SquareNodeType = Node<SquareData, "square">;
 
 export const SquareNode = memo(function SquareNode({ id, data, selected, width, height }: NodeProps<SquareNodeType>) {
@@ -18,6 +18,7 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
   const releaseLock = useTreeStore((s) => s.releaseLock);
   const editor = useTreeStore((s) => s.peers.find((p) => p.editingNodeId === id)?.user ?? null);
   const { lockedBy } = useLock(id);
+  const hot = useTreeStore((s) => s.pdfOpen && (s.hoverSource?.nodeId === id || s.activeSource?.nodeId === id));
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -43,9 +44,9 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
 
   return (
     <div
-      style={{ width: width ?? 240, height: height ?? 120, boxShadow: editor ? `0 0 0 3px ${editor.color}` : undefined }}
+      style={{ width: width ?? 240, height: height ?? 120, boxShadow: hot ? "0 0 0 4px rgba(245,158,11,.55), 0 8px 24px rgba(245,158,11,.35)" : editor ? `0 0 0 3px ${editor.color}` : undefined, transform: hot ? "scale(1.05)" : undefined, transformOrigin: "center", transition: "transform 160ms ease, box-shadow 160ms ease" }}
       className={`group relative flex flex-col rounded-lg border-2 bg-white shadow-sm dark:bg-neutral-900 ${
-        required || data.hole ? "border-red-400" : data.isRoot ? "border-amber-500" : selected ? "border-sky-500" : data.onPath ? "border-emerald-600" : "border-neutral-300 dark:border-neutral-600"
+        hot ? "border-amber-500" : required || data.hole ? "border-red-400" : data.isRoot ? "border-amber-500" : selected ? "border-sky-500" : data.onPath ? "border-emerald-600" : "border-neutral-300 dark:border-neutral-600"
       } ${lockedBy ? "bg-neutral-100 dark:bg-neutral-800" : ""} ${data.hole ? "bg-red-50 dark:bg-red-950/40" : ""}`}
     >
       {editor && (
@@ -61,10 +62,11 @@ export const SquareNode = memo(function SquareNode({ id, data, selected, width, 
       />
       <Handle type="target" position={Position.Top} className="!h-3 !w-3 !bg-neutral-400" />
       <Handle type="target" id="anchor" position={Position.Right} style={{ opacity: 0, pointerEvents: "none", top: "50%" }} />
+      <Handle type="source" id="src" position={Position.Right} style={{ opacity: 0, pointerEvents: "none", top: "50%" }} />
       <Handle type="source" position={Position.Bottom} className="!h-3 !w-3 !bg-sky-500" />
 
       <div className="flex h-5 shrink-0 cursor-grab items-center justify-between rounded-t px-2 text-[10px] text-neutral-400 active:cursor-grabbing">
-        <span>{data.isRoot ? "Top level question" : `#${data.number}`}</span>
+        <span>{data.isRoot ? "Top level question" : `#${data.number}`}{data.sourceCount ? <span title={`${data.sourceCount} source${data.sourceCount > 1 ? "s" : ""} in the PDF`} className="ml-1.5 rounded bg-amber-100 px-1 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">{data.sourceCount} src</span> : null}</span>
         <span className="tracking-widest">⋮⋮⋮</span>
       </div>
 

@@ -1,12 +1,14 @@
 "use client";
+import { useMemo } from "react";
 import { create } from "zustand";
 import * as Y from "yjs";
 import YProvider from "y-partyserver/provider";
 import { Awareness } from "y-protocols/awareness";
-import type { TreeDocument, TreeNode, TreeEdge, NodeId, EdgeId, NodeLock } from "@/types/tree";
+import type { TreeDocument, TreeNode, TreeEdge, NodeId, EdgeId, NodeLock, TreeInfo } from "@/types/tree";
+import { listSources, sourceScrollTop, type PdfLayout, type SourceItem } from "./sources";
 import { LOCK_TIMEOUT_MS } from "@/types/tree";
 import { exampleDocument, mkEdge, mkNode, NODE_H, NODE_W } from "./seed";
-import { fullName, partyHost, TREE_ID, type Me } from "./api";
+import { api, currentTreeId, fullName, partyHost, treeHref, WORKER_ORIGIN, type Me } from "./api";
 
 export interface Peer {
   clientId: number;
@@ -15,7 +17,11 @@ export interface Peer {
   editingNodeId: NodeId | null;
 }
 
+export interface SourcePick { nodeId: NodeId; index: number }
+
 interface State {
+  treeId: string;
+  trees: TreeInfo[];
   doc: TreeDocument;
   hydrated: boolean;
   connected: boolean;
@@ -33,9 +39,28 @@ interface State {
   panelExpanded: boolean;
   panelView: "tree" | "history" | "chats";
 
+  pdfOpen: boolean;
+  pdfPos: { x: number; y: number } | null;
+  pdfScrollTop: number;
+  pdfLayout: PdfLayout | null;
+  hoverSource: SourcePick | null;
+  activeSource: (SourcePick & { n: number }) | null;
+  pdfScrollTo: number | null;
+
   connect: (me: Me) => () => void;
+  loadTrees: () => Promise<void>;
+  createTree: (name: string, seed?: "empty" | "example" | "civic-signal") => Promise<string | null>;
+  uploadPdf: (file: File) => Promise<boolean>;
   resetEmpty: () => void;
   loadExample: () => void;
+
+  setPdfOpen: (v: boolean) => void;
+  setPdfPos: (x: number, y: number) => void;
+  setPdfScrollTop: (top: number) => void;
+  setPdfLayout: (l: PdfLayout | null) => void;
+  setHoverSource: (s: SourcePick | null) => void;
+  jumpToSource: (nodeId: NodeId, index: number) => void;
+  clearPdfScrollTo: () => void;
 
   addNode: (pos: { x: number; y: number }, text?: string) => NodeId;
   addChild: (parentId: NodeId, text?: string) => NodeId;
@@ -62,7 +87,7 @@ interface State {
 }
 
 const now = () => new Date().toISOString();
-const emptyDoc = (): TreeDocument => ({ version: 1, tree: { id: TREE_ID, name: "", rootNodeId: "", createdAt: "", updatedAt: "" }, nodes: [], edges: [] });
+const emptyDoc = (id: string): TreeDocument => ({ version: 1, tree: { id, name: "", rootNodeId: "", createdAt: "", updatedAt: "" }, nodes: [], edges: [] });
 
 let ydoc: Y.Doc | null = null;
 let provider: YProvider | null = null;
@@ -81,7 +106,7 @@ export const useTreeStore = create<State>((set, get) => {
     const { meta, nodes, edges } = maps();
     return {
       version: 1,
-      tree: { id: TREE_ID, name: String(meta.get("name") ?? ""), rootNodeId: String(meta.get("rootNodeId") ?? ""), createdAt: String(meta.get("createdAt") ?? ""), updatedAt: String(meta.get("updatedAt") ?? "") },
+      tree: { id: get().treeId, name: String(meta.get("name") ?? ""), rootNodeId: String(meta.get("rootNodeId") ?? ""), createdAt: String(meta.get("createdAt") ?? ""), updatedAt: String(meta.get("updatedAt") ?? "") },
       nodes: [...nodes.values()],
       edges: [...edges.values()],
     };
@@ -103,7 +128,9 @@ export const useTreeStore = create<State>((set, get) => {
   };
 
   return {
-    doc: emptyDoc(),
+    treeId: "main",
+    trees: [],
+    doc: emptyDoc("main"),
     hydrated: false,
     connected: false,
     me: null,
@@ -118,14 +145,23 @@ export const useTreeStore = create<State>((set, get) => {
     panelWidth: 420,
     panelExpanded: false,
     panelView: "tree",
+    pdfOpen: false,
+    pdfPos: null,
+    pdfScrollTop: 0,
+    pdfLayout: null,
+    hoverSource: null,
+    activeSource: null,
+    pdfScrollTo: null,
 
     connect: (me) => {
       if (provider) provider.destroy();
+      const treeId = currentTreeId();
       ydoc = new Y.Doc();
       awareness = new Awareness(ydoc);
       awareness.setLocalState({ user: { id: me.id, name: fullName(me), color: me.color }, cursor: null, editingNodeId: null });
-      provider = new YProvider(partyHost(), TREE_ID, ydoc, { party: "tree-room", awareness });
-      set({ me });
+      provider = new YProvider(partyHost(), treeId, ydoc, { party: "tree-room", awareness });
+      set({ me, treeId, doc: emptyDoc(treeId) });
+      get().loadTrees();
 
       const { nodes, edges, meta, locks, bubbles } = maps();
       const onChange = () => refresh();
@@ -170,27 +206,58 @@ export const useTreeStore = create<State>((set, get) => {
       };
     },
 
+    loadTrees: async () => {
+      const { status, data } = await api<{ trees: TreeInfo[] }>("/api/trees");
+      if (status === 200) set({ trees: data.trees ?? [] });
+    },
+    createTree: async (name, seed = "empty") => {
+      const { status, data } = await api<{ ok?: boolean; id?: string; error?: string }>("/api/trees", { method: "POST", body: JSON.stringify({ name, seed }) });
+      if (status !== 200 || !data.id) { alert(data.error ?? "Could not create the tree"); return null; }
+      window.location.href = treeHref(data.id);
+      return data.id;
+    },
+    uploadPdf: async (file) => {
+      const res = await fetch(`${WORKER_ORIGIN}/api/tree/${get().treeId}/pdf`, { method: "PUT", credentials: "include", headers: { "Content-Type": "application/pdf" }, body: file });
+      if (!res.ok) { alert("The PDF could not be uploaded"); return false; }
+      await get().loadTrees();
+      set({ pdfOpen: true, pdfLayout: null, pdfScrollTop: 0 });
+      return true;
+    },
     resetEmpty: () => {
       const { nodes, edges, locks, meta } = maps();
-      const root = mkNode(TREE_ID, { x: 0, y: 0, isRoot: true, width: 360, height: 120 });
+      const root = mkNode(get().treeId, { x: 0, y: 0, isRoot: true, width: 360, height: 120 });
       tx(() => {
         nodes.clear(); edges.clear(); locks.clear();
         nodes.set(root.id, root);
-        meta.set("rootNodeId", root.id); meta.set("name", "Rates went up");
+        meta.set("rootNodeId", root.id);
       });
       set({ selectedNodeId: null, selectedEdgeId: null });
     },
     loadExample: () => {
       const ex = exampleDocument();
       const { nodes, edges, locks, meta } = maps();
+      const treeId = get().treeId;
       tx(() => {
         nodes.clear(); edges.clear(); locks.clear();
-        for (const n of ex.nodes) nodes.set(n.id, { ...n, treeId: TREE_ID });
-        for (const e of ex.edges) edges.set(e.id, { ...e, treeId: TREE_ID });
+        for (const n of ex.nodes) nodes.set(n.id, { ...n, treeId });
+        for (const e of ex.edges) edges.set(e.id, { ...e, treeId });
         meta.set("rootNodeId", ex.tree.rootNodeId); meta.set("name", ex.tree.name);
       });
       set({ selectedNodeId: null, selectedEdgeId: null });
     },
+
+    setPdfOpen: (v) => set({ pdfOpen: v, hoverSource: null, activeSource: v ? get().activeSource : null }),
+    setPdfPos: (x, y) => set({ pdfPos: { x: Math.round(x), y: Math.round(y) } }),
+    setPdfScrollTop: (top) => set({ pdfScrollTop: top }),
+    setPdfLayout: (l) => set({ pdfLayout: l }),
+    setHoverSource: (h) => set({ hoverSource: h }),
+    jumpToSource: (nodeId, index) => {
+      const ref = get().doc.nodes.find((n) => n.id === nodeId)?.sources?.[index];
+      if (!ref) return;
+      const layout = get().pdfLayout;
+      set({ pdfOpen: true, activeSource: { nodeId, index, n: (get().activeSource?.n ?? 0) + 1 }, pdfScrollTo: layout ? sourceScrollTop(layout, ref) : null });
+    },
+    clearPdfScrollTo: () => set({ pdfScrollTo: null }),
 
     addNode: (pos, text = "") => {
       const existing = get().doc.nodes;
@@ -198,7 +265,7 @@ export const useTreeStore = create<State>((set, get) => {
         existing.some((o) => x < o.x + o.width + 20 && x + NODE_W + 20 > o.x && y < o.y + o.height + 20 && y + NODE_H + 20 > o.y);
       let { x, y } = pos;
       for (let i = 0; i < 50 && overlaps(x, y); i++) y += NODE_H + 40;
-      const n = mkNode(TREE_ID, { x, y, text, width: NODE_W, height: NODE_H, createdBy: meId(), updatedBy: meId() });
+      const n = mkNode(get().treeId, { x, y, text, width: NODE_W, height: NODE_H, createdBy: meId(), updatedBy: meId() });
       tx(() => maps().nodes.set(n.id, n));
       set({ selectedNodeId: n.id, selectedEdgeId: null, focusNodeId: n.id });
       return n.id;
@@ -207,8 +274,8 @@ export const useTreeStore = create<State>((set, get) => {
       const parent = get().doc.nodes.find((n) => n.id === parentId);
       if (!parent) return get().addNode({ x: 0, y: 0 }, text);
       const siblings = get().doc.edges.filter((e) => e.source === parentId).length;
-      const n = mkNode(TREE_ID, { x: parent.x + siblings * (NODE_W + 40), y: parent.y + parent.height + 100, text, createdBy: meId(), updatedBy: meId() });
-      const e = mkEdge(TREE_ID, parentId, n.id);
+      const n = mkNode(get().treeId, { x: parent.x + siblings * (NODE_W + 40), y: parent.y + parent.height + 100, text, createdBy: meId(), updatedBy: meId() });
+      const e = mkEdge(get().treeId, parentId, n.id);
       e.createdBy = meId();
       tx(() => { maps().nodes.set(n.id, n); maps().edges.set(e.id, e); });
       set({ selectedNodeId: n.id, selectedEdgeId: null, focusNodeId: n.id });
@@ -231,7 +298,7 @@ export const useTreeStore = create<State>((set, get) => {
     addEdge: (source, target) => {
       if (source === target) return;
       if (get().doc.edges.some((e) => e.source === source && e.target === target)) return;
-      const e = mkEdge(TREE_ID, source, target); e.createdBy = meId();
+      const e = mkEdge(get().treeId, source, target); e.createdBy = meId();
       tx(() => maps().edges.set(e.id, e));
     },
     setEdgeLabel: (id, label) => {
@@ -276,6 +343,11 @@ export const useTreeStore = create<State>((set, get) => {
     setPanelView: (v) => set({ panelView: v }),
   };
 });
+
+export function useSources(): SourceItem[] {
+  const doc = useTreeStore((s) => s.doc);
+  return useMemo(() => listSources(doc), [doc]);
+}
 
 export function useLock(nodeId: NodeId): { lockedBy: NodeLock | null; mine: boolean } {
   const lock = useTreeStore((s) => s.locks[nodeId]);

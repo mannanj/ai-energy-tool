@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useTreeStore } from "@/lib/store";
 import { api, fullName } from "@/lib/api";
+import { PdfButton } from "@/components/PdfButton";
 
 const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
@@ -15,6 +16,8 @@ export function Presence() {
   const others = peers.filter((p) => (seen.has(p.user.id) ? false : (seen.add(p.user.id), true)));
   const signOut = async () => { await api("/api/signout", { method: "POST" }); window.location.href = "/signin"; };
   return (
+    <>
+    <PdfButton />
     <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white/95 p-1 shadow-md dark:border-neutral-700 dark:bg-neutral-900/95">
       <span title={connected ? "Connected" : "Reconnecting…"} className={`mx-1 h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-400"}`} />
       {others.map((p) => (
@@ -34,5 +37,6 @@ export function Presence() {
         )}
       </span>
     </div>
+    </>
   );
 }

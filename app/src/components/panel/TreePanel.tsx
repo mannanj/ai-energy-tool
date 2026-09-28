@@ -7,6 +7,7 @@ import { LinkPills } from "@/components/LinkPills";
 import { HistoryView } from "./HistoryView";
 import { ChatsView } from "./ChatsView";
 import { useChatStore } from "@/lib/chats";
+import { treeHref } from "@/lib/api";
 
 const ADD_PLACEHOLDER =
   "Add a square. Paste or type text and links here, for example a question, an answer, a phone number, or a source URL like https://www.dss.virginia.gov/relief/pipp/. Links become pills you can copy and share. Press Cmd/Ctrl+Enter to add.";
@@ -60,7 +61,7 @@ export function TreePanel({ popout = false }: Props) {
   };
 
   const openPopout = () => {
-    window.open("/panel", "aet-panel", "popup=yes,width=720,height=900");
+    window.open(treeHref(useTreeStore.getState().treeId, "/panel"), "aet-panel", "popup=yes,width=720,height=900");
   };
 
   const style = popout ? { width: "100%" } : { width: expanded ? "calc(100vw - 72px)" : width };

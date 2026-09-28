@@ -1,6 +1,7 @@
 export interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  FILES: R2Bucket;
   TreeRoom: DurableObjectNamespace;
   ChatStore: DurableObjectNamespace;
   EMAIL?: { send(msg: { to: string; from: { email: string; name?: string }; subject: string; text: string; html?: string }): Promise<void> };

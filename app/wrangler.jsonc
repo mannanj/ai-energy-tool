@@ -9,6 +9,7 @@
   "durable_objects": { "bindings": [{ "name": "TreeRoom", "class_name": "TreeRoom" }, { "name": "ChatStore", "class_name": "ChatStore" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TreeRoom"] }, { "tag": "v2", "new_sqlite_classes": ["ChatStore"] }],
   "d1_databases": [{ "binding": "DB", "database_name": "ai-energy-tool", "database_id": "aada9a3e-f90e-480c-8b3c-3fbcb722e5ed", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "ai-energy-tool-files" }],
   "send_email": [{ "name": "EMAIL" }],
   "observability": { "enabled": true },
   "vars": {

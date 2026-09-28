@@ -1,5 +1,18 @@
 export const WORKER_ORIGIN = process.env.NEXT_PUBLIC_WORKER_ORIGIN || "";
-export const TREE_ID = "main";
+export const DEFAULT_TREE_ID = "main";
+
+export function currentTreeId(): string {
+  if (typeof window === "undefined") return DEFAULT_TREE_ID;
+  const t = new URLSearchParams(window.location.search).get("tree");
+  return t && /^[\w-]{2,40}$/.test(t) ? t : DEFAULT_TREE_ID;
+}
+
+export function treeHref(id: string, path = "/"): string {
+  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  if (id === DEFAULT_TREE_ID) params.delete("tree"); else params.set("tree", id);
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
+}
 
 export interface Me { id: string; firstName: string; lastName: string; email: string; color: string }
 

@@ -12,6 +12,10 @@ import { BubbleNode, type BubbleNodeType } from "@/components/nodes/BubbleNode";
 import { LabeledEdge } from "./LabeledEdge";
 import { ThreadEdge } from "./ThreadEdge";
 import { AnchorEdge } from "./AnchorEdge";
+import { SourceEdge } from "./SourceEdge";
+import { PdfNode, type PdfNodeType } from "@/components/nodes/PdfNode";
+import { listSources, PDF_HEADER, PDF_NODE_ID, PDF_W, JUMP_OFFSET } from "@/lib/sources";
+import { WORKER_ORIGIN } from "@/lib/api";
 import { chatColor, chatLabel, useChatStore } from "@/lib/chats";
 import { Toolbar } from "./Toolbar";
 import { StatsBadge } from "./StatsBadge";
@@ -19,8 +23,8 @@ import { Cursors } from "./Cursors";
 import { NODE_H, NODE_W } from "@/lib/seed";
 import { groupStacks } from "@/lib/stacks";
 
-const nodeTypes = { square: SquareNode, bubble: BubbleNode };
-const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge, anchor: AnchorEdge };
+const nodeTypes = { square: SquareNode, bubble: BubbleNode, pdf: PdfNode };
+const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge, anchor: AnchorEdge, source: SourceEdge };
 const BUBBLE_GAP = 14, BUBBLE_COL = 314;
 const spreadFor = (cols: number) => (cols ? 1 + (Math.min(cols, 4) * BUBBLE_COL) / 300 : 1);
 
@@ -40,7 +44,27 @@ export function TreeCanvas() {
       setCursor(rf.screenToFlowPosition({ x: clientX, y: clientY }));
     });
   }, [rf, setCursor]);
-  const { moveNode, resizeNode, addEdge, select, addNode, addChild, deleteNode, deleteEdge, moveBubble } = useTreeStore.getState();
+  const { moveNode, resizeNode, addEdge, select, addNode, addChild, deleteNode, deleteEdge, moveBubble, setPdfPos } = useTreeStore.getState();
+  const treeId = useTreeStore((s) => s.treeId);
+  const pdfOpen = useTreeStore((s) => s.pdfOpen);
+  const hasPdf = useTreeStore((s) => !!s.trees.find((t) => t.id === s.treeId)?.pdfKey);
+  const pdfPos = useTreeStore((s) => s.pdfPos);
+  const activeSource = useTreeStore((s) => s.activeSource);
+  const showPdf = pdfOpen && hasPdf;
+  useEffect(() => {
+    if (!showPdf || pdfPos || !doc.nodes.length) return;
+    const maxX = Math.max(...doc.nodes.map((n) => n.x + n.width));
+    const minY = Math.min(...doc.nodes.map((n) => n.y));
+    setPdfPos(maxX + 260, minY);
+  }, [showPdf, pdfPos, doc.nodes, setPdfPos]);
+  useEffect(() => {
+    if (!activeSource || !pdfPos) return;
+    const t = setTimeout(() => rf.setCenter(pdfPos.x + PDF_W / 2, pdfPos.y + PDF_HEADER + JUMP_OFFSET + 140, { zoom: Math.max(rf.getZoom(), 0.9), duration: 450 }), 80);
+    return () => clearTimeout(t);
+  }, [activeSource, pdfPos, rf]);
+  const sourceItems = useMemo(() => listSources(doc), [doc]);
+  const sourceCounts = useMemo(() => { const m = new Map<string, number>(); for (const s of sourceItems) m.set(s.nodeId, (m.get(s.nodeId) ?? 0) + 1); return m; }, [sourceItems]);
+  const sourceEdges = useMemo<Edge[]>(() => showPdf && pdfPos ? sourceItems.map((s) => ({ id: `s:${s.key}`, source: s.nodeId, sourceHandle: "src", target: PDF_NODE_ID, targetHandle: "anchor", type: "source", selectable: false, deletable: false, focusable: false, zIndex: 4, data: { nodeId: s.nodeId, index: s.index, n: s.n, ref: s.ref } })) : [], [showPdf, pdfPos, sourceItems]);
   const bubblePos = useTreeStore((s) => s.bubblePos);
   const inspectOn = useChatStore((s) => s.inspectOn);
   const chats = useChatStore((s) => s.chats);
@@ -49,6 +73,7 @@ export function TreeCanvas() {
   const derived = useMemo(() => deriveTree(doc), [doc]);
   const spread = inspectOn ? spreadFor(shown.length) : 1;
   const spreadRef = useRef(spread); spreadRef.current = spread;
+  const pdfNodes = useMemo<PdfNodeType[]>(() => showPdf && pdfPos ? [{ id: PDF_NODE_ID, type: "pdf", position: { x: pdfPos.x * spread, y: pdfPos.y }, draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 3, data: { url: `${WORKER_ORIGIN}/api/tree/${treeId}/pdf` } }] : [], [showPdf, pdfPos, treeId, spread]);
 
   const hover = useChatStore((s) => s.hover);
   const focus = useChatStore((s) => s.focus);
@@ -108,11 +133,12 @@ export function TreeCanvas() {
         height: n.height,
         selected: n.id === selectedNodeId,
         deletable: !n.isRoot,
-        data: { text: n.text, isRoot: n.isRoot, number: derived.get(n.id)?.number ?? "", autoFocus: focusNodeId === n.id, onPath: pathIds.has(n.id), hole: inspectOn && !n.text.trim() && !n.isRoot },
+        data: { text: n.text, isRoot: n.isRoot, number: derived.get(n.id)?.number ?? "", autoFocus: focusNodeId === n.id, onPath: pathIds.has(n.id), hole: inspectOn && !n.text.trim() && !n.isRoot,
+          sourceCount: showPdf ? sourceCounts.get(n.id) ?? 0 : 0 },
       })),
-    [doc.nodes, derived, selectedNodeId, focusNodeId, pathIds, inspectOn, spread],
+    [doc.nodes, derived, selectedNodeId, focusNodeId, pathIds, inspectOn, spread, showPdf, sourceCounts],
   );
-  const allNodes = useMemo(() => [...nodes, ...bubbles.nodesOut] as (SquareNodeType | BubbleNodeType)[], [nodes, bubbles]);
+  const allNodes = useMemo(() => [...nodes, ...bubbles.nodesOut, ...pdfNodes] as (SquareNodeType | BubbleNodeType | PdfNodeType)[], [nodes, bubbles, pdfNodes]);
 
   const edges: Edge[] = useMemo(
     () =>
@@ -127,11 +153,15 @@ export function TreeCanvas() {
       })),
     [doc.edges, selectedEdgeId],
   );
-  const allEdges = useMemo(() => [...edges, ...bubbles.edgesOut], [edges, bubbles]);
+  const allEdges = useMemo(() => [...edges, ...bubbles.edgesOut, ...sourceEdges], [edges, bubbles, sourceEdges]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     for (const c of changes) {
       const k = spreadRef.current;
+      if ("id" in c && c.id === PDF_NODE_ID) {
+        if (c.type === "position" && c.position) setPdfPos(c.position.x / k, c.position.y);
+        continue;
+      }
       if ("id" in c && c.id.startsWith("b:")) {
         if (c.type === "position" && c.position) { const sq = squareOf(c.id.slice(2)); if (sq) moveBubble(c.id.slice(2), c.position.x - sq.x * k, c.position.y - sq.y); }
         continue;
@@ -147,11 +177,11 @@ export function TreeCanvas() {
         else if (st.selectedNodeId === c.id) select(null, st.selectedEdgeId);
       }
     }
-  }, [moveNode, deleteNode, resizeNode, select, moveBubble, squareOf]);
+  }, [moveNode, deleteNode, resizeNode, select, moveBubble, squareOf, setPdfPos]);
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     for (const c of changes) {
-      if ("id" in c && c.id.startsWith("t:")) continue;
+      if ("id" in c && (c.id.startsWith("t:") || c.id.startsWith("s:"))) continue;
       if (c.type === "remove") deleteEdge(c.id);
       else if (c.type === "select") {
         const st = useTreeStore.getState();

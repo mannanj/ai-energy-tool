@@ -2,6 +2,8 @@ import { getServerByName, routePartykitRequest } from "partyserver";
 import type { Env } from "./env";
 import { clearCookie, consumeLoginToken, createLoginToken, gateCookie, getSession, hasGate, passwordMatches, sessionCookie, upsertUser, SESSION_COOKIE, GATE_COOKIE } from "./auth";
 import { sendMagicLink } from "./email";
+import { CIVIC_SIGNAL_PDF_KEY } from "../src/lib/seed-civic-signal";
+import type { TreeInfo } from "../src/types/tree";
 export { TreeRoom } from "./room";
 export { ChatStore } from "./chat";
 
@@ -14,8 +16,26 @@ function cors(req: Request, env: Env, res: Response): Response {
   h.set("Access-Control-Allow-Origin", origin);
   h.set("Access-Control-Allow-Credentials", "true");
   h.set("Access-Control-Allow-Headers", "Content-Type");
-  h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  h.set("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
   return new Response(res.body, { status: res.status, headers: h });
+}
+
+const newTreeId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+
+async function listTrees(env: Env): Promise<TreeInfo[]> {
+  const r = await env.DB.prepare("SELECT id, name, created_at, created_by, pdf_key FROM tree ORDER BY created_at").all<{ id: string; name: string; created_at: string; created_by: string; pdf_key: string | null }>();
+  return r.results.map((t) => ({ id: t.id, name: t.name, createdAt: t.created_at, createdBy: t.created_by, pdfKey: t.pdf_key }));
+}
+
+async function treeInfo(env: Env, id: string): Promise<TreeInfo | null> {
+  const t = await env.DB.prepare("SELECT id, name, created_at, created_by, pdf_key FROM tree WHERE id = ?").bind(id).first<{ id: string; name: string; created_at: string; created_by: string; pdf_key: string | null }>();
+  return t ? { id: t.id, name: t.name, createdAt: t.created_at, createdBy: t.created_by, pdfKey: t.pdf_key } : null;
+}
+
+async function roomFetch(env: Env, treeId: string, sub: string, author: string, body?: string, method = body === undefined ? "GET" : "POST"): Promise<Response> {
+  const stub = await getServerByName(env.TreeRoom as unknown as Parameters<typeof getServerByName>[0], treeId);
+  const headers = new Headers({ "Content-Type": "application/json", "x-aet-user": author });
+  return stub.fetch(new Request(`https://room/parties/tree-room/${treeId}${sub}`, { method, headers, body }));
 }
 
 const isChatApi = (path: string) => path === "/api/chat" || path === "/api/tree" || path.startsWith("/api/chats") || path.startsWith("/api/admin/");
@@ -81,13 +101,50 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
     return json({ ok: true }, { headers });
   }
 
+  if (path === "/api/trees") {
+    const s = await getSession(req, env);
+    if (!s) return json({ error: "session" }, { status: 401 });
+    if (req.method === "GET") return json({ trees: await listTrees(env) });
+    if (req.method === "POST") {
+      const b = (await req.json().catch(() => ({}))) as { name?: string; id?: string; seed?: string };
+      const name = (b.name ?? "").trim().slice(0, 80);
+      if (!name) return json({ error: "A name is required" }, { status: 400 });
+      const id = b.id && /^[\w-]{2,40}$/.test(b.id) ? b.id : newTreeId();
+      if (await treeInfo(env, id)) return json({ error: "That tree id already exists" }, { status: 409 });
+      const author = `${s.firstName} ${s.lastName}`.trim();
+      const created = await roomFetch(env, id, "/init", author, JSON.stringify({ name, seed: b.seed ?? "empty" }));
+      if (!created.ok) return json({ error: "Could not create the tree" }, { status: 500 });
+      const pdfKey = b.seed === "civic-signal" ? CIVIC_SIGNAL_PDF_KEY : null;
+      await env.DB.prepare("INSERT INTO tree (id, name, created_at, created_by, pdf_key) VALUES (?, ?, ?, ?, ?)").bind(id, name, new Date().toISOString(), author, pdfKey).run();
+      return json({ ok: true, id });
+    }
+  }
+
+  const pdf = /^\/api\/tree\/([\w-]+)\/pdf$/.exec(path);
+  if (pdf) {
+    const s = await getSession(req, env);
+    if (!s) return json({ error: "session" }, { status: 401 });
+    const info = await treeInfo(env, pdf[1]);
+    if (!info) return json({ error: "not found" }, { status: 404 });
+    if (req.method === "GET") {
+      if (!info.pdfKey) return json({ error: "no pdf" }, { status: 404 });
+      const obj = await env.FILES.get(info.pdfKey);
+      if (!obj) return json({ error: "no pdf" }, { status: 404 });
+      return new Response(obj.body, { headers: { "Content-Type": "application/pdf", "Cache-Control": "private, max-age=60", ETag: obj.httpEtag } });
+    }
+    if (req.method === "PUT") {
+      const key = `trees/${pdf[1]}.pdf`;
+      await env.FILES.put(key, req.body, { httpMetadata: { contentType: "application/pdf" } });
+      await env.DB.prepare("UPDATE tree SET pdf_key = ? WHERE id = ?").bind(key, pdf[1]).run();
+      return json({ ok: true, pdfKey: key });
+    }
+  }
+
   const m = /^\/api\/tree\/([\w-]+)\/(export|versions(?:\/\d+(?:\/restore)?)?)$/.exec(path);
   if (m) {
     const s = await getSession(req, env);
     if (!s) return json({ error: "session" }, { status: 401 });
-    const stub = await getServerByName(env.TreeRoom as unknown as Parameters<typeof getServerByName>[0], m[1]);
-    const headers = new Headers({ "Content-Type": "application/json", "x-aet-user": `${s.firstName} ${s.lastName}`.trim() });
-    return stub.fetch(new Request(`https://room/parties/tree-room/${m[1]}/${m[2]}`, { method: req.method, headers, body: req.method === "POST" ? await req.text() : undefined }));
+    return roomFetch(env, m[1], `/${m[2]}`, `${s.firstName} ${s.lastName}`.trim(), req.method === "POST" ? await req.text() : undefined, req.method);
   }
 
   return json({ error: "not found" }, { status: 404 });

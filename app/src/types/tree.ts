@@ -3,10 +3,19 @@ export type NodeId = string;
 export type EdgeId = string;
 export type UserId = string;
 
+export interface SourceRef {
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface TreeNode {
   id: NodeId;
   treeId: TreeId;
   text: string;
+  sources?: SourceRef[];
   x: number;
   y: number;
   width: number;
@@ -34,6 +43,14 @@ export interface Tree {
   rootNodeId: NodeId;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TreeInfo {
+  id: TreeId;
+  name: string;
+  createdAt: string;
+  createdBy: string;
+  pdfKey: string | null;
 }
 
 export interface TreeDocument {
