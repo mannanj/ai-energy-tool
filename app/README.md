@@ -45,12 +45,22 @@ For fast UI iteration run `bun run dev -p 3010` alongside wrangler; `.env.develo
 `localhost:8971` for the API and WebSocket (CORS is allowed for `DEV_ORIGIN` in `.dev.vars`). For the chat
 plugin also run `cd ../chat && bun server.ts` (port 8972).
 
+## Tests
+
+`e2e/trees-and-pdf.py` drives the real app with Playwright (`python3 e2e/trees-and-pdf.py`, needs `pip install
+playwright` and both dev servers): tree list and creation, the switcher, autosave of typed text, child squares,
+delete, checkpoint and restore, PDF upload, the PDF panel with its source lines, highlights, jumps and hover.
+Point it at production with `E2E_BASE`, `E2E_API`, `E2E_MUTATE=0` (skips creating trees) and `E2E_COOKIE` from
+`SESSION_SECRET=$(security find-generic-password -a "$USER" -s ai-energy-tool-session-secret -w) bun e2e/session-cookie.ts`.
+The chat plugin's own checks are in `../chat` (`bun test`, `bun ./scripts/mutate.ts`, `bun ./scripts/validate-context.ts`).
+
 ## Deploy
 
 ```bash
 export CLOUDFLARE_API_TOKEN=$(security find-generic-password -a "$USER" -s cf-task-full-stack-project -w)  # or mint one with cf-custom-grant
 bun run build && bunx wrangler deploy
 bunx wrangler d1 migrations apply ai-energy-tool --remote   # only when migrations/ changed
+bunx wrangler r2 object put ai-energy-tool-files/trees/civic-signal.pdf --file ../context/team-docs/civic-signal-sources.pdf --remote   # once
 ```
 
 ## Using it

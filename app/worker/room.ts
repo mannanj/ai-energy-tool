@@ -3,7 +3,7 @@ import { withYjs } from "y-partyserver";
 import * as Y from "yjs";
 import type { TreeDocument, TreeNode, TreeEdge } from "../src/types/tree";
 import { emptyDocument, exampleDocument } from "../src/lib/seed";
-import { civicSignalDocument } from "../src/lib/seed-civic-signal";
+import { CIVIC_SIGNAL_TREE_ID, civicSignalDocument } from "../src/lib/seed-civic-signal";
 
 export class TreeRoom extends withYjs(Server) {
   static options = { hibernate: true };
@@ -20,7 +20,7 @@ export class TreeRoom extends withYjs(Server) {
     if (rows.length) {
       Y.applyUpdate(this.document, new Uint8Array(rows[0].data as ArrayBuffer));
     }
-    if (!this.document.getMap("meta").get("rootNodeId")) this.seed(this.name === "main" ? exampleDocument() : emptyDocument(""));
+    if (!this.document.getMap("meta").get("rootNodeId")) this.seed(this.name === "main" ? exampleDocument() : this.name === CIVIC_SIGNAL_TREE_ID ? civicSignalDocument() : emptyDocument(""));
   }
 
   async onSave() {
