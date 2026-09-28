@@ -16,7 +16,7 @@ def check(name, ok, detail=""):
 
 
 def api(path, method="GET", body=None, ctype="application/json"):
-    req = urllib.request.Request(API + path, method=method, data=body, headers={"Content-Type": ctype, "Cookie": COOKIE})
+    req = urllib.request.Request(API + path, method=method, data=body, headers={"Content-Type": ctype, "Cookie": COOKIE, "User-Agent": "Mozilla/5.0 (e2e)"})
     try:
         with urllib.request.urlopen(req) as r:
             data = r.read()
