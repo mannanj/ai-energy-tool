@@ -41,3 +41,6 @@ Every request from today, in order. Done items name the commit.
 25. Your message shows instantly; the helper bubble shows dots and status while it thinks. `#n` numbers 30% smaller.
 26. Chats never end: after any outcome the next message walks the tree again with facts kept; income questions the math already knows are skipped.
 27. Canvas never hides a message: messages on the same square merge into one scrollable stack; thread lines blue 2px, bubble-to-square lines green.
+28. Adversarial gold chat "adversarial-troll" seeded (seed v3): tries prompt injection, poems, water bill, repeats, long rambles, fake developer credit, SSN, insults, arithmetic, then answers honestly. Findings in docs/chat-experience-review.md. Fixes: vague "can you help me" is not declined; trick messages never count as answers or misses; soft "probably not" reads as No.
+29. URL keeps the panel state: ?panel=chats|tree|history&chat=<id>. Reload restores the panel, the tab, the selected chat, and jumps the canvas to it. Other params such as tree are preserved.
+30. Another Claude session (multi-tree switching, PDF sources) is editing this repo in parallel; file ownership agreed by message; my deploys build from a clean worktree of my own commit so their in-progress files never ship.

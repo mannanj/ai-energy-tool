@@ -52,7 +52,7 @@ export async function chatApi(req: Request, origin: string): Promise<Response | 
       const sc = SCENARIOS.find((s) => s.name === b.scenario) ?? (b.opener ? { name: "custom", opener: b.opener, persona: b.persona ?? "Answer plausibly and briefly." } : null);
       if (!sc) return json({ error: "scenario or opener required" }, 400);
       const log: string[] = [];
-      try { const id = await runScenario(sc, 8, (l) => log.push(l)); return json({ id, link: shareLink(id), log }); }
+      try { const id = await runScenario(sc, sc.turns ?? 8, (l) => log.push(l)); return json({ id, link: shareLink(id), log }); }
       catch (e) { return json({ error: (e as Error).message, log }, 502); }
     }
     let m = p.match(/^\/api\/chats\/([A-Za-z0-9]+)\/rerun$/);

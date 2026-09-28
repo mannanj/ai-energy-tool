@@ -5,7 +5,7 @@ import { writeReviewed, type Draft, type Review } from "./writer";
 import { activePrompt } from "./prompts";
 import { DECLINE_REPLY, HOLE_REPLY, Tree, fetchWorkerTree, isHole, loadTree, workerEnabled, type TreeNode } from "./tree";
 import { host } from "./host";
-import { extractFacts, incomeCheck, yesNo, type Facts, type ToolRun } from "./tools";
+import { extractFacts, incomeCheck, isTrick, yesNo, type Facts, type ToolRun } from "./tools";
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 export const READER = readerName;
@@ -81,6 +81,7 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
   if (decided) { r = { label: decided.label, onTopic: true, offTopic: false, bye: false, language: s.language ?? "en" }; trace.read = { reader: "tools", ms: 0, skipped: true }; }
   else { const t1 = Date.now(); r = await read(text, cur.text, first ? [] : opts_, first); trace.read = { reader: READER(), ms: Date.now() - t1 }; }
   if (r.language && r.language !== "other") s.language = r.language;
+  if (!first && r.label != null && isTrick(text)) { trace.tools.push({ tool: "guard", ms: 0, input: text.slice(0, 60), result: `instruction or trick, not an answer; ignoring reader label ${r.label}`, label: null, decided: true }); r = { ...r, label: null, bye: false }; }
   const decidedFallback = !!decided && decided.label == null;
 
   const spoken: string[] = []; const nodeIds: string[] = [];
@@ -90,7 +91,7 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
 
   if (first) {
     if (rewalk && r.bye && !r.onTopic) { spoken.push(GOODBYE); finish("resident_ended"); }
-    else if (!r.onTopic) { spoken.push(DECLINE_REPLY); finish("off_topic"); }
+    else if (!r.onTopic && r.offTopic) { spoken.push(DECLINE_REPLY); finish("off_topic"); }
     else { s.path.push(cur.id); nodeIds.push(cur.id); go(T.select(cur.id, null)); }
   } else if (r.bye && !r.label) {
     spoken.push(GOODBYE); finish("resident_ended");
@@ -98,9 +99,10 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
     const fallback = T.select(cur.id, null).filter((n) => !T.children(cur.id).some((e) => e.target === n.id && (e.label?.trim() && !/^(either|any|all|always)$/i.test(e.label))));
     if (decidedFallback && fallback.length) go(fallback);
     else {
-      s.misses = (s.misses ?? 0) + 1;
+      const looksLikeAnswer = !/[?]|\b(can you|could you|would you|please|write|tell me|ignore|instructions|prompt|test mode|developer)\b/i.test(text) && text.trim().split(/\s+/).length <= 15;
+      if (looksLikeAnswer) s.misses = (s.misses ?? 0) + 1;
       if (r.offTopic) spoken.push(DECLINE_REPLY + "\n\nBack to your electric bill. " + cur.text.trim());
-      else if (s.misses >= 2 && fallback.length) go(fallback);
+      else if ((s.misses ?? 0) >= 2 && fallback.length) go(fallback);
       else spoken.push(NOT_HEARD + cur.text.trim());
     }
   } else {

@@ -55,7 +55,7 @@ async function readWithJev(state: Record<string, unknown>, options: Option[], cr
       bye: { type: "noul", instructions: "Is `resident_message` wrapping up the conversation (thanks, that's all, bye, ok I'll call them) rather than asking or answering anything?" },
       language: { type: "choice", instructions: "What language is `resident_message` written in?", criteria: { en: "English", es: "Spanish", other: "Another language" } },
     };
-    if (first) q.on_topic = { type: "noul", instructions: "Is `resident_message` a version of `root_question`, or otherwise about paying, lowering, or getting help with an electric bill, a shutoff, or a disconnection notice?", criteria: { true: "Yes, an electric bill or electricity service problem", false: "No, a different topic" } };
+    if (first) q.on_topic = { type: "noul", instructions: "Is `resident_message` a version of `root_question`, or otherwise about paying, lowering, or getting help with an electric bill, a shutoff, or a disconnection notice, or a general request for help that names no other topic?", criteria: { true: "Yes: an electric bill or electricity problem, or a general ask for help", false: "No, clearly about a different topic" } };
     if (options.length) q.label = { type: "choice", instructions: "The helper said `helper_just_said`. Which option does `resident_message` answer with? Short replies ('no', 'yes', 'gas', '2 people') answer what the helper asked.", criteria: crit };
     const a = await jev(state, q);
     const label = a.label?.choice && a.label.choice !== "__none__" ? a.label.choice : null;

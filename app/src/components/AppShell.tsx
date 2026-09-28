@@ -5,12 +5,14 @@ import { useSession } from "@/lib/useSession";
 import { TreeCanvas } from "@/components/canvas/TreeCanvas";
 import { TreePanel } from "@/components/panel/TreePanel";
 import { Presence } from "@/components/Presence";
+import { useUrlState } from "@/lib/urlState";
 
 export function AppShell() {
   const { status } = useSession();
   const panelOpen = useTreeStore((s) => s.panelOpen);
   const setPanelOpen = useTreeStore((s) => s.setPanelOpen);
   const hydrated = useTreeStore((s) => s.hydrated);
+  useUrlState();
 
   if (status !== "ready" || !hydrated) {
     return <div className="flex h-screen w-screen items-center justify-center text-[13px] text-neutral-500">{status === "redirecting" ? "Redirecting…" : "Connecting to the tree…"}</div>;

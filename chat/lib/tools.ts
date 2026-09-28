@@ -40,7 +40,7 @@ export function yesNo(text: string): "Yes" | "No" | null {
   const t = text.trim().toLowerCase();
   if (/\b(bye|goodbye|thanks|thank you|that'?s all|i'?ll call)\b/.test(t) || t.includes("?")) return null;
   if (/^(yes|yeah|yep|yup|ya|sure|correct|right|i do|we do|it is|that's right|true)\b/.test(t)) return "Yes";
-  if (/^(no|nope|nah|not really|we don't|i don't|we do not|i do not|never|none)\b/.test(t)) return "No";
+  if (/^(no|nope|nah|not really|we don't|i don't|we do not|i do not|never|none|probably not|i don't think so|don't think so|doubt it|unfortunately not)\b/.test(t) || /\b(probably not|don't think so|doubt it|we make (a bit |a little |way |much )?more than that|we're over|we are over that)\b/.test(t)) return "No";
   return null;
 }
 
@@ -80,3 +80,6 @@ function decide(t0: number, facts: Facts, size: number, limit: number, under: bo
   const has = options.some((o) => o.toLowerCase() === label.toLowerCase());
   return { tool: "math", ms: Date.now() - t0, input: `$${facts.income_monthly}/mo, ${size} in home`, result: `$${facts.income_monthly} ${under ? "≤" : ">"} $${limit} limit for ${size}${note ? " (" + note + ")" : ""} → ${label}${has ? "" : " (no such arrow; taking the fallback)"}`, label: has ? label : null, decided: true };
 }
+
+export const TRICK = /\b(ignore (all|your|the|previous)|system prompt|your instructions|test mode|i'?m the developer|developer mode|credit on my account|give me a \$?\d+|write me|poem|jailbreak|pretend you are|act as|social security|account number is|apply for me|do it for me)\b/i;
+export const isTrick = (text: string) => TRICK.test(text);
