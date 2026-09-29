@@ -34,7 +34,9 @@ How a turn works (`lib/turn.ts`):
 
 The speech-bubble button in the editor's toolbar turns the plugin on. Every message of each chat on the
 canvas is a bubble beside the square the reply came from: resident (blue) then helper (orange), joined by a
-line in the chat's colour, chat to chat in separate columns. In chat mode the tree spreads out horizontally
+line in the chat's colour, chat to chat in separate columns. Consecutive replies at the same square share one
+stack; when the chat comes back to a square later, that is a new stack under the earlier one, so the line
+follows the chat through time and never loops back into an old bubble. In chat mode the tree spreads out horizontally
 so the columns fit. Bubbles drag like squares; their offset from their square is saved in the shared tree
 document (Yjs map `bubbles`), so everyone sees the same layout and bubbles follow their square. The panel's
 **chats** tab lists chats, shows one (only what the resident saw), runs a scenario against the current tree,

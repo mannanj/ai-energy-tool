@@ -28,6 +28,16 @@ which walks this very tree: it reads the live document from the Worker's export 
 message is a draggable bubble beside the square its reply came from; bubble positions live in the shared
 document (Yjs map `bubbles`). "rerun from here" replays a chat through the current tree. See `../chat/README.md`.
 
+The map and the panel always show the same chat. Clicking a bubble, or one message in it, opens that chat in
+the panel and scrolls the panel to that message; hovering or clicking a message in the panel lights the bubble
+and moves the map to it, scrolling inside the stack if needed. The panel opens every chat at the top. The
+selection, hover and reveal are mirrored across windows (`src/lib/chatSync.ts`, a BroadcastChannel), so the
+popped-out panel drives the main window's map. Bubbles are grouped into stacks by consecutive replies at the
+same square, in time order: when a chat comes back to a square it already visited, that is a new stack
+("back here, visit 2") placed under the earlier one, and the thread line runs stack to stack through time
+(`src/lib/stacks.ts`). The chat list is re-read from the server whenever the window regains focus, and every
+chat request is sent with `cache: "no-store"`.
+
 ## Run locally
 
 ```bash
@@ -52,6 +62,15 @@ playwright` and both dev servers): tree list and creation, the switcher, autosav
 delete, checkpoint and restore, PDF upload, the PDF panel with its source lines, highlights, jumps and hover.
 Point it at production with `E2E_BASE`, `E2E_API`, `E2E_MUTATE=0` (skips creating trees) and `E2E_COOKIE` from
 `SESSION_SECRET=$(security find-generic-password -a "$USER" -s ai-energy-tool-session-secret -w) bun e2e/session-cookie.ts`.
+`e2e/chat-sync.py` covers the chat plugin in **chromium and webkit** (`E2E_BROWSERS`): bubble click reveals the
+message in the panel, chips, list clicks open at the top, panel hover and click drive the map and the stack's
+own scroll, wheel over a stack scrolls the stack and not the map, `?chat=` on load, a stale `?chat=`, archiving
+the current chat, refresh on window focus, the popped-out panel syncing the main map, and the thread order of
+stacks. `bun test` runs the unit tests in `test/` (stack grouping, scroll helper).
+`bun scripts/mutate-chat-sync.ts [unit|e2e]` plants one-line bugs in the sync code; the unit tier must be
+caught by `bun test`, the e2e tier by `e2e/chat-sync.py` on chromium. A stale `?chat=` has two defenses (the URL hook drops it, and the
+next chat refresh clears any current chat that is gone), so a mutant on one of them is masked by the other and
+is not in the list.
 The chat plugin's own checks are in `../chat` (`bun test`, `bun ./scripts/mutate.ts`, `bun ./scripts/validate-context.ts`).
 
 ## Deploy

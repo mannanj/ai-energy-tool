@@ -26,7 +26,7 @@ import { groupStacks } from "@/lib/stacks";
 const nodeTypes = { square: SquareNode, bubble: BubbleNode, pdf: PdfNode };
 const edgeTypes = { labeled: LabeledEdge, thread: ThreadEdge, anchor: AnchorEdge, source: SourceEdge };
 const BUBBLE_GAP = 14, BUBBLE_COL = 314;
-const spreadFor = (cols: number) => (cols ? 1 + (Math.min(cols, 4) * BUBBLE_COL) / 300 : 1);
+const spreadFor = (cols: number) => (cols ? 1 + (Math.min(cols, 8) * BUBBLE_COL) / 300 : 1);
 
 export function TreeCanvas() {
   const doc = useTreeStore((s) => s.doc);
@@ -71,7 +71,12 @@ export function TreeCanvas() {
   const shown = useChatStore((s) => s.shown);
 
   const derived = useMemo(() => deriveTree(doc), [doc]);
-  const spread = inspectOn ? spreadFor(shown.length) : 1;
+  const stacksByChat = useMemo(() => {
+    const tree = { nodes: doc.nodes, tree: { rootNodeId: doc.tree.rootNodeId } };
+    return new Map(shown.map((cid) => { const c = chats.find((x) => x.id === cid); return [cid, c ? groupStacks(c, tree) : []]; }));
+  }, [shown, chats, doc.nodes, doc.tree.rootNodeId]);
+  const laps = useMemo(() => Math.max(1, ...[...stacksByChat.values()].flat().map((st) => st.visit)), [stacksByChat]);
+  const spread = inspectOn ? spreadFor(shown.length * laps) : 1;
   const spreadRef = useRef(spread); spreadRef.current = spread;
   const pdfNodes = useMemo<PdfNodeType[]>(() => showPdf && pdfPos ? [{ id: PDF_NODE_ID, type: "pdf", position: { x: pdfPos.x * spread, y: pdfPos.y }, draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 3, data: { url: `${WORKER_ORIGIN}/api/tree/${treeId}/pdf` } }] : [], [showPdf, pdfPos, treeId, spread]);
 
@@ -87,20 +92,19 @@ export function TreeCanvas() {
     const nodesOut: BubbleNodeType[] = []; const edgesOut: Edge[] = [];
     if (!inspectOn) return { nodesOut, edgesOut };
     const sq = new Map(doc.nodes.map((n) => [n.id, n]));
-    const tree = { nodes: doc.nodes, tree: { rootNodeId: doc.tree.rootNodeId } };
     shown.forEach((cid, col) => {
       const c = chats.find((x) => x.id === cid); if (!c) return;
       const color = chatColor(shown, cid);
       const nth = new Map<number, number>(); const cnt = { user: 0, assistant: 0 }; for (const m of c.messages) nth.set(m.seq, ++cnt[m.role]);
       let prev: string | null = null;
-      groupStacks(c, tree).forEach((st, i) => {
+      (stacksByChat.get(cid) ?? []).forEach((st, i) => {
         const n = sq.get(st.squareId); if (!n) return;
         const base = { x: n.x * spread, y: n.y };
         const saved = bubblePos[st.key];
-        const pos = saved ? { x: base.x + saved.x, y: base.y + saved.y } : { x: base.x + n.width + BUBBLE_GAP + col * BUBBLE_COL, y: base.y + (st.messages[0].role === "user" ? -70 : 0) };
+        const pos = saved ? { x: base.x + saved.x, y: base.y + saved.y } : { x: base.x + n.width + BUBBLE_GAP + (col + (st.visit - 1) * shown.length) * BUBBLE_COL, y: base.y + (st.messages[0].role === "user" ? -70 : 0) };
         const mine = !!hover && hover.chatId === cid;
         nodesOut.push({ id: st.id, type: "bubble", draggable: true, selectable: false, connectable: false, deletable: false, zIndex: 5, position: pos,
-          data: { chatId: cid, color, label: i === 0 && shown.length > 1 ? chatLabel(c) + " · " + cid : null,
+          data: { chatId: cid, color, label: i === 0 && shown.length > 1 ? chatLabel(c) + " · " + cid : null, visit: st.visit,
             hotChat: mine && hover.seq == null, hotSeq: mine && hover.seq != null ? hover.seq : null,
             messages: st.messages.map((m) => ({ seq: m.seq, role: m.role, content: m.content, nodeIds: m.node_ids, review: m.review, n: nth.get(m.seq) ?? 0 })) } });
         if (prev) edgesOut.push({ id: `t:${prev}:${st.id}`, source: prev, target: st.id, type: "thread", selectable: false, deletable: false, focusable: false, data: { color } });
@@ -109,7 +113,7 @@ export function TreeCanvas() {
       });
     });
     return { nodesOut, edgesOut };
-  }, [inspectOn, chats, shown, doc.nodes, doc.tree.rootNodeId, bubblePos, spread, hover]);
+  }, [inspectOn, chats, shown, stacksByChat, doc.nodes, bubblePos, spread, hover]);
   const squareOf = useCallback((bubbleKey: string) => {
     const cid = bubbleKey.slice(0, bubbleKey.lastIndexOf(":"));
     const c = chats.find((x) => x.id === cid); if (!c) return null;

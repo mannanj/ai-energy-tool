@@ -1,10 +1,11 @@
 "use client";
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { useChatStore, type Review } from "@/lib/chats";
+import { scrollWithin } from "@/lib/chatSync";
 
 export type StackMessage = { seq: number; role: "user" | "assistant"; content: string; nodeIds: string[]; review: Review | null; n: number };
-export type BubbleData = { chatId: string; color: string; label: string | null; messages: StackMessage[]; hotSeq: number | null; hotChat: boolean };
+export type BubbleData = { chatId: string; color: string; label: string | null; visit: number; messages: StackMessage[]; hotSeq: number | null; hotChat: boolean };
 export type BubbleNodeType = Node<BubbleData, "bubble">;
 
 const Human = ({ n }: { n: number }) => (
@@ -41,9 +42,12 @@ function Message({ m, chatId, hot }: { m: StackMessage; chatId: string; hot: boo
   const rerun = useChatStore((s) => s.rerun);
   const busy = useChatStore((s) => s.busy);
   const setHover = useChatStore((s) => s.setHover);
+  const pick = useChatStore((s) => s.pick);
   const user = m.role === "user";
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (hot) scrollWithin(ref.current, ref.current?.parentElement ?? null); }, [hot]);
   return (
-    <div className="flex flex-col gap-1" style={{ transform: hot ? "scale(1.02)" : undefined, transformOrigin: "left center", transition: "transform 120ms" }} onMouseEnter={() => setHover({ chatId, seq: m.seq })}>
+    <div ref={ref} data-seq={m.seq} className="flex flex-col gap-1" style={{ transform: hot ? "scale(1.02)" : undefined, transformOrigin: "left center", transition: "transform 120ms" }} onMouseEnter={() => setHover({ chatId, seq: m.seq })} onClick={(e) => { e.stopPropagation(); pick(chatId, m.seq); }}>
       <div className="relative">
         {user ? <Human n={m.n} /> : <Robot n={m.n} />}
         <div title={user ? "Resident" : "square " + m.nodeIds.join(", ")}
@@ -64,15 +68,16 @@ function Message({ m, chatId, hot }: { m: StackMessage; chatId: string; hot: boo
 }
 
 export const BubbleNode = memo(function BubbleNode({ data }: NodeProps<BubbleNodeType>) {
-  const select = useChatStore((s) => s.select);
+  const pick = useChatStore((s) => s.pick);
   const setHover = useChatStore((s) => s.setHover);
   return (
-    <div style={{ width: 300 }} className={`flex flex-col gap-1 rounded-2xl text-[11px] leading-snug transition-shadow ${data.hotChat ? "ring-1 ring-sky-400/30" : ""}`} onClick={() => select(data.chatId, true)} onMouseEnter={() => setHover({ chatId: data.chatId })} onMouseLeave={() => setHover(null)}>
+    <div style={{ width: 300 }} data-chat={data.chatId} className={`flex flex-col gap-1 rounded-2xl text-[11px] leading-snug transition-shadow ${data.hotChat ? "ring-1 ring-sky-400/30" : ""}`} onClick={() => pick(data.chatId, data.messages[0]?.seq)} onMouseEnter={() => setHover({ chatId: data.chatId })} onMouseLeave={() => setHover(null)}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none", left: 44 }} />
       <Handle type="source" id="anchor" position={Position.Left} style={{ opacity: 0, pointerEvents: "none", left: 30, top: "50%" }} />
       <div title="Drag to move" className="ml-[30px] h-2 cursor-grab rounded-full opacity-60" style={{ background: data.color }} />
       {data.label && <span className="ml-[30px] cursor-grab pl-2 text-[9px] font-semibold" style={{ color: data.color }}>Chat: {data.label}</span>}
-      <div className="nowheel nodrag flex max-h-[22em] flex-col gap-2 overflow-auto p-1">
+      {data.visit > 1 && <span data-testid="stack-visit" className="ml-[30px] cursor-grab pl-2 text-[9px] font-semibold" style={{ color: data.color }}>back here, visit {data.visit}</span>}
+      <div data-testid="stack-scroll" className="nowheel nodrag relative flex max-h-[22em] flex-col gap-2 overflow-auto p-1">
         {data.messages.map((m) => <Message key={m.seq} m={m} chatId={data.chatId} hot={data.hotSeq === m.seq} />)}
       </div>
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none", left: 44 }} />

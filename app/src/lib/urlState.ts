@@ -25,8 +25,9 @@ export function useUrlState() {
 
   useEffect(() => {
     const id = wanted.current;
-    if (!id || !chats.some((c) => c.id === id)) return;
+    if (!id || !chats.length) return;
     wanted.current = null;
+    if (!chats.some((c) => c.id === id)) { useChatStore.getState().showAll(); return; }
     const st = useChatStore.getState();
     st.select(id);
     setTimeout(() => st.jumpTo(id), 300);

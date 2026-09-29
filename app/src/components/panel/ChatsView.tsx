@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { scrollWithin } from "@/lib/chatSync";
 import { CHAT_ORIGIN, chatColor, chatLabel, useChatStore, type Chat } from "@/lib/chats";
 import { Rich } from "@/components/nodes/BubbleNode";
 
@@ -45,7 +46,8 @@ const PendingPair = ({ text, startedAt, nUser, nHelper }: { text: string; starte
 );
 
 export function ChatsView() {
-  const { chats, shown, current, busy, pending, error, reachable, hover } = useChatStore();
+  const { chats, shown, current, busy, pending, error, reachable, hover, reveal } = useChatStore();
+  const scroller = useRef<HTMLDivElement>(null);
   const { load, select, showAll, rerun, send, archive, setHover, jumpTo } = useChatStore.getState();
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState("");
@@ -63,27 +65,45 @@ export function ChatsView() {
   const dirty = !!picked && text !== picked.text;
   const answer = (id: string) => { const t = reply.trim(); if (!t || busy) return; setReply(""); send(id, t); };
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const again = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("focus", again);
+    document.addEventListener("visibilitychange", again);
+    return () => { window.removeEventListener("focus", again); document.removeEventListener("visibilitychange", again); };
+  }, [load]);
   const c: Chat | undefined = chats.find((x) => x.id === current);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = 0; }, [current]);
+  useEffect(() => {
+    if (!reveal || reveal.chatId !== current || reveal.seq == null || !scroller.current) return;
+    scrollWithin(scroller.current.querySelector<HTMLElement>(`[data-seq="${reveal.seq}"]`), scroller.current, 48);
+  }, [reveal, current]);
+  const lit = (chatId: string, seq: number) => (!!hover && hover.chatId === chatId && hover.seq === seq) || (!!reveal && reveal.chatId === chatId && reveal.seq === seq);
 
   if (!reachable) return <div className="p-3 text-[12px] text-neutral-600 dark:text-neutral-300">The chat backend did not answer{CHAT_ORIGIN ? <> at <code>{CHAT_ORIGIN}</code></> : ""}. {error && <div className="mt-1 text-red-600">{error}</div>}</div>;
 
   if (c) {
     return (
-      <div className="relative flex h-full flex-col overflow-y-auto">
-        <a href="#" onClick={(e) => { e.preventDefault(); showAll(); }} className="sticky top-2 z-10 ml-2 mr-auto rounded-lg bg-white/80 px-2 py-1 text-[12px] text-emerald-700 shadow backdrop-blur hover:bg-neutral-100 dark:bg-neutral-900/80 dark:text-emerald-400">← All chats</a>
+      <div ref={scroller} data-testid="chat-panel" data-chat={c.id} className="relative flex h-full flex-col overflow-y-auto">
+        <div data-testid="chat-head" className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 px-2 pb-1.5 pt-2 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/90">
+          <div className="flex items-center gap-2">
+            <a href="#" onClick={(e) => { e.preventDefault(); showAll(); }} className="shrink-0 rounded-lg px-1.5 py-0.5 text-[12px] text-emerald-700 hover:bg-neutral-100 dark:text-emerald-400 dark:hover:bg-neutral-800">← All chats</a>
+            <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: chatColor(shown, c.id) }} />
+            <span className="truncate text-[12px] font-semibold">{chatLabel(c)}</span>
+          </div>
         {shown.length > 1 && (
-          <div className="flex flex-wrap gap-1 px-3 pt-1">
-            {shown.map((id) => { const x = chats.find((y) => y.id === id); return x && <button key={id} onClick={() => select(id, true)} style={{ borderColor: chatColor(shown, id), color: id === current ? chatColor(shown, id) : undefined }} className={`rounded-full border px-2 py-px text-[11px] ${id === current ? "font-semibold" : "border-neutral-300 dark:border-neutral-600"}`}>{chatLabel(x)}</button>; })}
+          <div data-testid="chat-chips" className="flex flex-wrap gap-1 px-1 pt-1">
+            {shown.map((id) => { const x = chats.find((y) => y.id === id); return x && <button key={id} data-chat={id} onClick={() => select(id, true)} style={{ borderColor: chatColor(shown, id), color: id === current ? chatColor(shown, id) : undefined }} className={`rounded-full border px-2 py-px text-[11px] ${id === current ? "font-semibold" : "border-neutral-300 dark:border-neutral-600"}`}>{chatLabel(x)}</button>; })}
           </div>
         )}
-        <div className="truncate px-3 pb-1 pt-1 text-[11px] text-neutral-500" title={`${c.source}${c.scenario ? " · " + c.scenario : ""} · ${c.status}${c.state.ended_reason ? " (" + c.state.ended_reason + ")" : ""} · tree ${c.tree_updated_at ?? "?"}`}>
+        <div className="truncate px-1 pt-1 text-[11px] text-neutral-500" title={`${c.source}${c.scenario ? " · " + c.scenario : ""} · ${c.status}${c.state.ended_reason ? " (" + c.state.ended_reason + ")" : ""} · tree ${c.tree_updated_at ?? "?"}`}>
           {c.source}{c.scenario && <> · <b>{c.scenario}</b></>} · {c.status}{c.state.ended_reason && ` (${c.state.ended_reason})`}{c.parent_id && <> · rerun of <a href="#" className="underline" onClick={(e) => { e.preventDefault(); select(c.parent_id!, true); }}>{c.parent_id}</a> from #{c.parent_seq}</>} · <a className="underline" href={`${CHAT_ORIGIN}/c/${c.id}`} target="_blank" rel="noopener">open</a> · <a href="#" className="underline" onClick={(e) => { e.preventDefault(); archive(c.id, !c.archived); }}>{c.archived ? "unarchive" : "archive"}</a>
         </div>
-        <div className="flex flex-col gap-2 px-3 pb-6">
+        </div>
+        <div data-testid="chat-scroll" className="flex flex-col gap-2 px-3 pb-6 pt-2">
           {c.messages.map((m, i) => {
             const n = c.messages.slice(0, i + 1).filter((x) => x.role === m.role).length;
             return (
-              <div key={m.seq} onMouseEnter={() => setHover({ chatId: c.id, seq: m.seq })} onMouseLeave={() => setHover(null)} onClick={() => jumpTo(c.id, m.seq)} style={{ transform: hover && hover.chatId === c.id && hover.seq === m.seq ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`relative ml-[34px] cursor-pointer rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${hover && hover.chatId === c.id && hover.seq === m.seq ? "ring-2 ring-sky-400/50" : ""} ${m.role === "user" ? USER_BUBBLE : HELPER_BUBBLE}`}>
+              <div key={m.seq} data-seq={m.seq} onMouseEnter={() => setHover({ chatId: c.id, seq: m.seq })} onMouseLeave={() => setHover(null)} onClick={() => jumpTo(c.id, m.seq)} style={{ transform: lit(c.id, m.seq) ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`relative ml-[34px] cursor-pointer rounded-2xl border px-2.5 py-2 text-[13px] leading-snug shadow-sm ${lit(c.id, m.seq) ? "ring-2 ring-sky-400/50" : ""} ${m.role === "user" ? USER_BUBBLE : HELPER_BUBBLE}`}>
                 <Avatar role={m.role} n={n} />
                 <Rich text={m.content} />
                 {m.role === "assistant" && m.trace && (
@@ -141,9 +161,9 @@ export function ChatsView() {
       </div>
       {pending && pending.chatId == null && <div className="flex flex-col gap-2 px-3 pb-3"><PendingPair text={pending.userText} startedAt={pending.startedAt} nUser={1} nHelper={1} /></div>}
       <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-neutral-500">History ({chats.length})</div>
-      <ul className="flex-1">
+      <ul data-testid="chat-list" className="flex-1">
         {chats.map((x) => (
-          <li key={x.id} onMouseEnter={() => setHover({ chatId: x.id })} onMouseLeave={() => setHover(null)} onClick={() => { select(x.id); jumpTo(x.id); }} style={{ transform: hover?.chatId === x.id ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`cursor-pointer rounded-lg px-3 py-2 text-[13px] ${hover?.chatId === x.id ? "ring-2 ring-sky-400/50" : ""}`}>
+          <li key={x.id} data-chat={x.id} onMouseEnter={() => setHover({ chatId: x.id })} onMouseLeave={() => setHover(null)} onClick={() => { select(x.id); jumpTo(x.id); }} style={{ transform: hover?.chatId === x.id ? "scale(1.02)" : undefined, transition: "transform 120ms" }} className={`cursor-pointer rounded-lg px-3 py-2 text-[13px] ${hover?.chatId === x.id ? "ring-2 ring-sky-400/50" : ""}`}>
             <div className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: chatColor(shown, x.id) }} />{chatLabel(x)}</div>
             <div className="text-[11px] text-neutral-500">{[x.source + (x.parent_id ? ` of ${x.parent_id}@${x.parent_seq}` : ""), x.status, Math.floor(x.message_count / 2) + " turns", new Date(x.created_at).toLocaleString()].filter(Boolean).join(" · ")}</div>
           </li>

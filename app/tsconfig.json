@@ -36,7 +36,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["e2e", 
+  "exclude": ["e2e", "test", "scripts", 
     "node_modules",
     "out",
     "worker"
