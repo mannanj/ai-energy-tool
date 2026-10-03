@@ -18,4 +18,8 @@ export interface Env {
   TYPESAFE_API_KEY?: string;
   TYPESAFE_MODEL?: string;
   SIM_MODEL?: string;
+  WHATSAPP_TOKEN?: string;
+  WHATSAPP_APP_SECRET?: string;
+  WHATSAPP_VERIFY_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
 }

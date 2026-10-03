@@ -7,6 +7,7 @@ import { migrate, sql } from "../../chat/lib/db";
 import { chatApi } from "../../chat/lib/routes";
 import { nanoid } from "../../chat/lib/id";
 import seed from "./seed-chats.json";
+import { whatsappTurn, type InboundMessage } from "./whatsapp";
 
 const PASS = ["OPENROUTER_API_KEY", "OPENROUTER_MODEL", "TYPESAFE_API_KEY", "TYPESAFE_MODEL", "SIM_MODEL"] as const;
 type Row = Record<string, string | number | null>;
@@ -71,6 +72,10 @@ export class ChatStore extends DurableObject<Env> {
 
   async fetch(req: Request): Promise<Response> {
     try { await (this.seeded ??= this.seedOnce()); } catch (e) { this.seeded = null; console.error("seed failed:", (e as Error).message); }
+    if (new URL(req.url).pathname === "/whatsapp/turn" && req.method === "POST") {
+      try { await whatsappTurn(this.env, (await req.json()) as InboundMessage); return new Response("ok"); }
+      catch (e) { console.error("whatsapp turn failed:", (e as Error).message); return new Response("failed", { status: 500 }); }
+    }
     return (await chatApi(req, this.env.APP_ORIGIN)) ?? Response.json({ error: "not found" }, { status: 404 });
   }
 }

@@ -2,6 +2,8 @@ import { getServerByName, routePartykitRequest } from "partyserver";
 import type { Env } from "./env";
 import { clearCookie, consumeLoginToken, createLoginToken, gateCookie, getSession, hasGate, passwordMatches, sessionCookie, upsertUser, SESSION_COOKIE, GATE_COOKIE } from "./auth";
 import { sendMagicLink } from "./email";
+import { whatsappWebhook } from "./whatsapp";
+import { privacyPage } from "./privacy";
 import { CIVIC_SIGNAL_PDF_KEY } from "../src/lib/seed-civic-signal";
 import type { TreeInfo } from "../src/types/tree";
 export { TreeRoom } from "./room";
@@ -41,11 +43,13 @@ async function roomFetch(env: Env, treeId: string, sub: string, author: string, 
 const isChatApi = (path: string) => path === "/api/chat" || path === "/api/tree" || path.startsWith("/api/chats") || path.startsWith("/api/admin/");
 const chatStore = (env: Env) => env.ChatStore.get(env.ChatStore.idFromName("main"));
 
-async function api(req: Request, env: Env, url: URL): Promise<Response> {
+async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const secure = url.protocol === "https:";
   const path = url.pathname;
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+
+  if (path === "/api/whatsapp") return whatsappWebhook(req, env, ctx, chatStore(env));
 
   if (isChatApi(path)) {
     if (!(await getSession(req, env))) return json({ error: "session" }, { status: 401 });
@@ -155,11 +159,12 @@ const expiredPage = () => `<!doctype html><meta charset="utf-8"><title>Link expi
 <h2>This sign-in link is no longer valid</h2><p>Links work once and expire after 20 minutes.</p><p><a href="/signin">Request a new one</a></p></body>`;
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname;
 
-    if (path.startsWith("/api/")) return cors(req, env, await api(req, env, url));
+    if (path.startsWith("/api/")) return cors(req, env, await api(req, env, url, ctx));
+    if (path === "/privacy") return new Response(privacyPage(env.APP_NAME), { headers: { "Content-Type": "text/html;charset=utf-8" } });
 
     if (path.startsWith("/parties/")) {
       if (!(await getSession(req, env))) return new Response("unauthorized", { status: 401 });
