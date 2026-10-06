@@ -4,6 +4,7 @@ import { runTurn } from "../../chat/lib/turn";
 
 const GRAPH = "https://graph.facebook.com/v25.0";
 const TEXT_ONLY = "I can only read text messages. Please type your question.";
+const AI_NOTICE = "Please be mindful this is an AI generated chat bot.";
 
 export interface InboundMessage { id: string; from: string; text: string | null }
 
@@ -79,7 +80,9 @@ export async function whatsappTurn(env: Env, m: InboundMessage): Promise<void> {
   if (!firstSighting(m.id)) return;
   await graph(env, { status: "read", message_id: m.id, typing_indicator: { type: "text" } });
   if (!m.text) { await graph(env, { to: m.from, type: "text", text: { body: TEXT_ONLY } }); return; }
-  const turn = await runTurn(openChatFor(m.from), m.text.slice(0, 4000), { source: "whatsapp" });
+  const openChat = openChatFor(m.from);
+  const turn = await runTurn(openChat, m.text.slice(0, 4000), { source: "whatsapp" });
   sql().run("INSERT OR REPLACE INTO whatsapp_contacts (wa_id, chat_id, updated_at) VALUES (?, ?, ?)", [m.from, turn.chatId, new Date().toISOString()]);
-  await graph(env, { to: m.from, type: "text", text: { body: turn.reply } });
+  const body = openChat === turn.chatId ? turn.reply : `${turn.reply}\n\n${AI_NOTICE}`;
+  await graph(env, { to: m.from, type: "text", text: { body } });
 }

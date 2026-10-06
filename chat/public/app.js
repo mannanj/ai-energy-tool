@@ -35,6 +35,7 @@
     const box = el("div", "intro");
     box.append(el("p", null, "Tell me what's going on with your electric bill. I'll ask a couple of short questions, then point you to the option that fits: a payment plan with Dominion, a program that lowers or pays part of the bill, or local help. Everything I say comes from a checked list of programs with the real phone numbers."));
     box.append(el("p", null, "If your power is off, you have a shutoff notice, or someone at home needs medical equipment that runs on electricity, say so first."));
+    box.append(el("p", null, "Please be mindful this is an AI generated chat bot."));
     const chips = el("div", "chips");
     for (const s of STARTERS) { const c = el("button", "chip", s); c.type = "button"; c.onclick = () => { input.value = s; form.requestSubmit(); }; chips.append(c); }
     box.append(chips);
