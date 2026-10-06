@@ -12,6 +12,7 @@
   ];
 
   let chatId = null;
+  const START_OVER = /(^|\s)\/\s*start[\s_-]*over\b|^\s*start[\s_-]*over\s*[.!]*\s*$/i;
   let readOnly = false;
 
   const m = location.pathname.match(/^\/c\/([A-Za-z0-9]+)/);
@@ -102,10 +103,22 @@
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
+  function startOver() {
+    chatId = null; readOnly = false;
+    main.innerHTML = ""; toolbar.innerHTML = "";
+    input.value = ""; input.style.height = "auto";
+    input.disabled = false; sendBtn.disabled = false;
+    input.placeholder = "Describe your situation in your own words…";
+    history.replaceState(null, "", "/");
+    showIntro();
+    input.focus();
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text || sendBtn.disabled) return;
+    if (START_OVER.test(text)) { startOver(); return; }
     const intro = main.querySelector(".intro"); if (intro) intro.remove();
     input.value = ""; input.style.height = "auto";
     bubble("user", text);

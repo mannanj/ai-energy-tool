@@ -5,6 +5,10 @@ import { runTurn } from "../../chat/lib/turn";
 const GRAPH = "https://graph.facebook.com/v25.0";
 const TEXT_ONLY = "I can only read text messages. Please type your question.";
 const AI_NOTICE = "Please be mindful this is an AI generated chat bot.";
+const STARTED_OVER = "Starting a new chat. Tell me what's going on with your electric bill.";
+const START_OVER = /(^|\s)\/\s*start[\s_-]*over\b|^\s*start[\s_-]*over\s*[.!]*\s*$/i;
+
+export const asksToStartOver = (text: string): boolean => START_OVER.test(text);
 
 export interface InboundMessage { id: string; from: string; text: string | null }
 
@@ -80,6 +84,11 @@ export async function whatsappTurn(env: Env, m: InboundMessage): Promise<void> {
   if (!firstSighting(m.id)) return;
   await graph(env, { status: "read", message_id: m.id, typing_indicator: { type: "text" } });
   if (!m.text) { await graph(env, { to: m.from, type: "text", text: { body: TEXT_ONLY } }); return; }
+  if (asksToStartOver(m.text)) {
+    sql().run("DELETE FROM whatsapp_contacts WHERE wa_id = ?", [m.from]);
+    await graph(env, { to: m.from, type: "text", text: { body: STARTED_OVER } });
+    return;
+  }
   const openChat = openChatFor(m.from);
   const turn = await runTurn(openChat, m.text.slice(0, 4000), { source: "whatsapp" });
   sql().run("INSERT OR REPLACE INTO whatsapp_contacts (wa_id, chat_id, updated_at) VALUES (?, ?, ?)", [m.from, turn.chatId, new Date().toISOString()]);
