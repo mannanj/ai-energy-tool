@@ -1,0 +1,11 @@
+{
+  "extraKnownMarketplaces": {
+    "cloudflare": { "source": { "source": "github", "repo": "cloudflare/skills" } },
+    "typesafe-ai": { "source": { "source": "github", "repo": "typesafe-ai/skills" } }
+  },
+  "enabledPlugins": {
+    "cloudflare@cloudflare": true,
+    "typesafe@typesafe-ai": true
+  },
+  "enabledMcpjsonServers": ["whatsapp_business_tools"]
+}
