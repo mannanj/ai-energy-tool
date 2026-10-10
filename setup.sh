@@ -251,12 +251,17 @@ step_whatsapp_local() {
     Bun.serve({
       port: Number(process.env.PORT),
       hostname: "127.0.0.1",
-      fetch(req) {
+      async fetch(req) {
         const url = new URL(req.url);
         if (url.pathname !== "/api/whatsapp") return new Response("not found", { status: 404 });
         const headers = new Headers(req.headers);
         headers.delete("host");
-        return fetch(process.env.WORKER + url.pathname + url.search, { method: req.method, headers, body: req.body });
+        headers.set("accept-encoding", "identity");
+        const res = await fetch(process.env.WORKER + url.pathname + url.search, { method: req.method, headers, body: req.body });
+        const out = new Headers(res.headers);
+        out.delete("content-encoding");
+        out.delete("content-length");
+        return new Response(res.body, { status: res.status, headers: out });
       },
     });
   ' >"$RUN_DIR/relay.log" 2>&1 &
