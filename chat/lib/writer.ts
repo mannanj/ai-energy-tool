@@ -3,6 +3,11 @@ import { activePrompt } from "./prompts";
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 const API = "https://api.typesafe.ai/v1/systemone";
+const STYLE = [
+  "Use simple, everyday words. Pick the common word over the official one (\"help paying\", not \"financial assistance\").",
+  "One idea per sentence. Keep most sentences under 15 words. Avoid long sentences joined with \"which\", \"although\", \"in order to\", \"as well as\", or several commas.",
+  "Sound neither formal nor casual: like a helpful neighbor at a service desk. No stiff phrases (\"kindly\", \"please be advised\", \"in the event that\"). No slang, no \"hey\", no exclamation marks, no emoji.",
+].join(" ");
 
 export interface Review { used: "written" | "verbatim"; code_ok: boolean; covers?: number; adds_nothing?: number; tone?: number; plain?: number; reason?: string; written?: string; attempts?: number; passed?: boolean; simplified?: boolean }
 export interface Draft { stage: "write" | "simplify" | "verbatim"; text: string; review: Omit<Review, "written"> }
@@ -23,6 +28,17 @@ export function codeCheck(facts: string, reply: string, conversation: string): {
   return { ok: true };
 }
 
+export const MAX_SENTENCE_WORDS = 20;
+const PLAIN_WHEN_TOO_LONG = 0.4;
+const sentences = (reply: string) => reply.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+const wordCount = (sentence: string) => (sentence.match(/[A-Za-z0-9$]\S*/g) ?? []).length;
+export function longestSentence(reply: string): number {
+  return Math.max(0, ...sentences(reply).map(wordCount));
+}
+export function longSentences(reply: string): string[] {
+  return sentences(reply).filter((s) => wordCount(s) > MAX_SENTENCE_WORDS);
+}
+
 export async function write(facts: string, history: ChatMessage[], kind: "step" | "answer" | "decline", feedback = ""): Promise<string> {
   const sys = [
     activePrompt().text.trim(),
@@ -35,7 +51,8 @@ export async function write(facts: string, history: ChatMessage[], kind: "step" 
     "- Add nothing that is not in FACTS: no program facts, no numbers, no links, no promises, no extra options. You may add warmth, one short acknowledgement of what the person just said, and plain-word explanations of words in FACTS.",
     kind === "step" ? "- FACTS ends in a question or asks for information. Your message must end by asking exactly that, and nothing else. One question per message." : "",
     kind === "answer" ? "- FACTS is the outcome. Give it clearly with the next step, then stop. Do not ask a question." : "",
-    "- 2 to 6 short sentences, or a short list. Plain words. Never ask for account numbers or Social Security numbers.",
+    "- 2 to 6 short sentences, or a short list. Never ask for account numbers or Social Security numbers.",
+    "- " + STYLE,
     "- Reply in the language the person is writing in.",
     "",
     feedback ? "- Your previous attempt was rejected: " + feedback + " Fix exactly that." : "",
@@ -44,7 +61,7 @@ export async function write(facts: string, history: ChatMessage[], kind: "step" 
     facts,
   ].filter(Boolean).join("\n");
   const messages: ChatMessage[] = [{ role: "system", content: sys }, ...history.slice(-8)];
-  return (await complete(MODEL, messages, { temperature: 0.4, maxTokens: 500 })).trim();
+  return (await complete(MODEL, messages, { temperature: 0.4, maxTokens: 2000 })).trim();
 }
 
 export async function writeReviewed(facts: string, history: ChatMessage[], kind: "step" | "answer" | "decline", saidByResident = "", attempts = 3): Promise<Review & { drafts: Draft[] }> {
@@ -67,7 +84,7 @@ export async function writeReviewed(facts: string, history: ChatMessage[], kind:
     if (r.code_ok && (!best || !best.code_ok || score(r) > score(best))) best = r;
     else if (!best) best = r;
     feedback = r.code_ok
-      ? `${(r.covers ?? 1) < 0.6 ? "it left out part of FACTS; say every point. " : ""}${(r.adds_nothing ?? 1) < 0.6 ? "it added something not in FACTS; add nothing. " : ""}${(r.tone ?? 1) < 0.5 ? (kind === "step" ? "it did not end by asking what FACTS asks. " : "it asked a question instead of stopping. ") : ""}${(r.plain ?? 1) < 0.5 ? "it had filler, a sympathy opener, or a copied team label; start with the substance. " : ""}`.trim()
+      ? `${(r.covers ?? 1) < 0.6 ? "it left out part of FACTS; say every point. " : ""}${(r.adds_nothing ?? 1) < 0.6 ? "it added something not in FACTS; add nothing. " : ""}${(r.tone ?? 1) < 0.5 ? (kind === "step" ? "it did not end by asking what FACTS asks. " : "it asked a question instead of stopping. ") : ""}${(r.plain ?? 1) < 0.5 ? "it was not simple enough: use short one-idea sentences and everyday words, keep a neutral tone, and start with the substance. " : ""}`.trim()
       : `${r.reason}; use only numbers and links that appear in FACTS.`;
   }
   if (best!.code_ok) return finish({ ...best!, used: "written", reason: `best of ${attempts} (${best!.reason ?? ""})` });
@@ -76,30 +93,38 @@ export async function writeReviewed(facts: string, history: ChatMessage[], kind:
 }
 
 export async function simplify(text: string, facts: string): Promise<string> {
+  const tooLong = longSentences(text);
+  const splitThese = tooLong.length
+    ? ` These sentences are over ${MAX_SENTENCE_WORDS} words. Split each one into two or three short sentences:\n${tooLong.map((s) => "- " + s).join("\n")}\n`
+    : " Split long sentences into short ones.";
   const messages: ChatMessage[] = [
-    { role: "system", content: "Rewrite the message in plain, direct language. Remove every filler phrase, sympathy opener, restatement of what the person said, and any team label (like \"Step 0\" or \"Branch A\"). Keep every phone number, link, email, dollar amount, date, percentage, program name and question exactly as written. Keep the same language. Output only the rewritten message.\n\nFor reference, the facts it must still contain:\n" + facts },
+    { role: "system", content: "Rewrite the message in plain, direct language. " + STYLE + splitThese + " Remove every filler phrase, sympathy opener, restatement of what the person said, and any team label (like \"Step 0\" or \"Branch A\"). Keep every phone number, link, email, dollar amount, date, percentage, program name and question exactly as written. Keep the same language. Output only the rewritten message.\n\nFor reference, the facts it must still contain:\n" + facts },
     { role: "user", content: text },
   ];
-  return (await complete(MODEL, messages, { temperature: 0.2, maxTokens: 500 })).trim() || text;
+  return (await complete(MODEL, messages, { temperature: 0.2, maxTokens: 2000 })).trim() || text;
 }
 const score = (r: Review) => Math.min(r.covers ?? 0, r.adds_nothing ?? 0, r.tone ?? 0, r.plain ?? 1);
 
 export async function review(facts: string, written: string, kind: "step" | "answer" | "decline", saidByResident = ""): Promise<Review> {
   const c = codeCheck(facts, written, saidByResident);
   if (!c.ok || !written) return { used: "verbatim", code_ok: false, reason: c.reason ?? "empty", written, passed: false };
-  if (!process.env.TYPESAFE_API_KEY) return { used: "written", code_ok: true, reason: "no reviewer key; code check only", written, passed: true };
+  const tooLong = longestSentence(written) > MAX_SENTENCE_WORDS;
+  const lengthOnly = (why: string): Review => tooLong
+    ? { used: "written", code_ok: true, plain: PLAIN_WHEN_TOO_LONG, reason: `${why}; a sentence is over ${MAX_SENTENCE_WORDS} words`, written, passed: false }
+    : { used: "written", code_ok: true, reason: `${why}; code check only`, written, passed: true };
+  if (!process.env.TYPESAFE_API_KEY) return lengthOnly("no reviewer key");
   const res = await fetch(API, {
     method: "POST", headers: { Authorization: `Bearer ${process.env.TYPESAFE_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: process.env.TYPESAFE_MODEL ?? "jev-latest", state: { facts, reply: written }, questions: {
       covers: { type: "noul", instructions: "Does `reply` convey every substantive point in `facts` (each program, number, contact, condition, and the question if `facts` asks one)? Rewording is fine; leaving a point out is not.", criteria: { true: "Every point in facts is present in reply", false: "At least one point from facts is missing" } },
       adds_nothing: { type: "noul", instructions: "Is `reply` free of program facts, numbers, contacts, dates, eligibility claims, or promises that are NOT in `facts`? Plain-word explanation of the same facts is fine.", criteria: { true: "Nothing new was added", false: "Reply states something factual that facts does not" } },
-      plain: { type: "noul", instructions: "Is `reply` free of filler: no sympathy opener (\"I hear you\", \"I understand\"), no throat-clearing (\"let's start with\", \"great question\"), and no team labels copied from `facts` such as \"Step 0\", \"Branch A\", \"Screener\"?", criteria: { true: "Direct and plain, starts with substance", false: "Has filler, a sympathy opener, or a copied team label" } },
+      plain: { type: "noul", instructions: "Is `reply` simple and plain: everyday words, short sentences with one idea each, a tone that is neither stiff and formal nor slangy, no filler or sympathy opener (\"I hear you\", \"I understand\"), no throat-clearing (\"let's start with\", \"great question\"), and no team labels copied from `facts` such as \"Step 0\", \"Branch A\", \"Screener\"?", criteria: { true: "Simple words, short one-idea sentences, neutral tone, starts with substance", false: "Has long or complex sentences, official or formal wording, slang, filler, a sympathy opener, or a copied team label" } },
       tone: { type: "noul", instructions: kind === "step" ? "Does `reply` end by asking what `facts` asks, and ask nothing else? (Rewording is fine.)" : "Does `reply` give the outcome in `facts` and stop, without asking a new question?", criteria: { true: "Yes", false: "No, it asks something different, adds another question, or asks when it should not" } },
     } }),
   });
-  if (!res.ok) return { used: "written", code_ok: true, reason: `reviewer error ${res.status}; code check only`, written, passed: true };
+  if (!res.ok) return lengthOnly(`reviewer error ${res.status}`);
   const a = ((await res.json()) as { answers: Record<string, { noul: number }> }).answers;
-  const covers = a.covers?.noul ?? 0, adds = a.adds_nothing?.noul ?? 0, tone = a.tone?.noul ?? 0, plain = a.plain?.noul ?? 1;
+  const covers = a.covers?.noul ?? 0, adds = a.adds_nothing?.noul ?? 0, tone = a.tone?.noul ?? 0, plain = Math.min(a.plain?.noul ?? 1, tooLong ? PLAIN_WHEN_TOO_LONG : 1);
   const ok = covers >= 0.6 && adds >= 0.6 && tone >= 0.5 && plain >= 0.5;
   return { used: ok ? "written" : "verbatim", code_ok: true, covers, adds_nothing: adds, tone, plain, reason: ok ? undefined : `review under the bar (covers ${covers.toFixed(2)}, adds_nothing ${adds.toFixed(2)}, tone ${tone.toFixed(2)}, plain ${plain.toFixed(2)})`, written, passed: ok };
 }
