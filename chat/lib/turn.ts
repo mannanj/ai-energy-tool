@@ -1,7 +1,7 @@
 import { addMessage, createChat, getChat, getMessages, getState, setState, type Chat } from "./db";
 import { read as defaultRead, readerName, translate, type Read, type Option } from "./judge";
 export type Reader = (text: string, said: string, options: Option[], first: boolean) => Promise<Read>;
-import { writeReviewed, type Draft, type Review } from "./writer";
+import { withoutTeamLabel, writeReviewed, type Draft, type Review } from "./writer";
 import { activePrompt } from "./prompts";
 import { DECLINE_REPLY, HOLE_REPLY, Tree, fetchWorkerTree, isHole, loadTree, workerEnabled, type TreeNode } from "./tree";
 import { host } from "./host";
@@ -85,7 +85,7 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
   const decidedFallback = !!decided && decided.label == null;
 
   const spoken: string[] = []; const nodeIds: string[] = [];
-  const say = (n: TreeNode) => { nodeIds.push(n.id); s.path.push(n.id); spoken.push(isHole(n) ? HOLE_REPLY : n.text.trim()); };
+  const say = (n: TreeNode) => { nodeIds.push(n.id); s.path.push(n.id); spoken.push(isHole(n) ? HOLE_REPLY : withoutTeamLabel(n.text.trim())); };
   const finish = (why: string) => { s.ended_reason = why; s.nodeId = null; };
   const go = (targets: TreeNode[]) => advance(T, targets, s, say, finish, trace.tools);
 
@@ -101,9 +101,9 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
     else {
       const looksLikeAnswer = !/[?]|\b(can you|could you|would you|please|write|tell me|ignore|instructions|prompt|test mode|developer)\b/i.test(text) && text.trim().split(/\s+/).length <= 15;
       if (looksLikeAnswer) s.misses = (s.misses ?? 0) + 1;
-      if (r.offTopic) spoken.push(DECLINE_REPLY + "\n\nBack to your electric bill. " + cur.text.trim());
+      if (r.offTopic) spoken.push(DECLINE_REPLY + "\n\nBack to your electric bill. " + withoutTeamLabel(cur.text.trim()));
       else if ((s.misses ?? 0) >= 2 && fallback.length) go(fallback);
-      else spoken.push(NOT_HEARD + cur.text.trim());
+      else spoken.push(NOT_HEARD + withoutTeamLabel(cur.text.trim()));
     }
   } else {
     go(T.select(cur.id, r.label));
@@ -123,6 +123,12 @@ export async function runTurn(chatId: string | null, text: string, opts: { sourc
       if (rev.used === "written" && rev.written) reply = rev.written;
     } catch (e) { rev = { used: "verbatim", code_ok: false, reason: "writer error: " + (e as Error).message }; }
     trace.write = { ms: Date.now() - t2, attempts: drafts.length, used: rev?.used ?? "verbatim" };
+  }
+  const language = s.language ?? "en";
+  if (!opts.verbatimOnly && language !== "en" && reply === verbatim && verbatim.trim()) {
+    const t3 = Date.now();
+    try { reply = await translate(verbatim, language); trace.tools.push({ tool: "translate", ms: Date.now() - t3, input: language, result: "translated the tree's own words" }); }
+    catch (e) { trace.tools.push({ tool: "translate", ms: Date.now() - t3, input: language, result: "failed: " + (e as Error).message }); }
   }
   trace.total_ms = Date.now() - t0;
   setState(chat.id, s, "open");

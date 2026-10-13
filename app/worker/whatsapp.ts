@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { getChat, sql } from "../../chat/lib/db";
 import { runTurn } from "../../chat/lib/turn";
+import { translate } from "../../chat/lib/judge";
 
 const GRAPH = "https://graph.facebook.com/v25.0";
 const TEXT_ONLY = "I can only read text messages. Please type your question.";
@@ -92,6 +93,8 @@ export async function whatsappTurn(env: Env, m: InboundMessage): Promise<void> {
   const openChat = openChatFor(m.from);
   const turn = await runTurn(openChat, m.text.slice(0, 4000), { source: "whatsapp" });
   sql().run("INSERT OR REPLACE INTO whatsapp_contacts (wa_id, chat_id, updated_at) VALUES (?, ?, ?)", [m.from, turn.chatId, new Date().toISOString()]);
-  const body = openChat === turn.chatId ? turn.reply : `${turn.reply}\n\n${AI_NOTICE}`;
+  const language = turn.state.language ?? "en";
+  const notice = language === "en" ? AI_NOTICE : await translate(AI_NOTICE, language).catch(() => AI_NOTICE);
+  const body = openChat === turn.chatId ? turn.reply : `${turn.reply}\n\n${notice}`;
   await graph(env, { to: m.from, type: "text", text: { body } });
 }
