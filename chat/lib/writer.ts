@@ -19,11 +19,16 @@ const digits = (t: string) => {
 };
 const links = (t: string) => new Set((t.match(/[a-z0-9.-]+\.(?:gov|org|com|net)\b[^\s)*]*/gi) ?? []).map((x) => x.toLowerCase().replace(/[.,*]+$/, "")));
 
+const TEAM_LABEL_AT_START = /^\s*(?:step\s*\d+|branch\s*[a-z]\d*|screener|urgent path)\b[^:.\n]{0,40}[:.]\s*/i;
+const TEAM_LABEL_ANYWHERE = /\b(?:branch|rama)\s+[a-z]\d?\b|\bscreener\b|\bstep\s*0\b/i;
+export const withoutTeamLabel = (squareText: string) => squareText.replace(TEAM_LABEL_AT_START, "");
+
 export function codeCheck(facts: string, reply: string, conversation: string): { ok: boolean; reason?: string } {
   const fd = new Set([...digits(facts), ...digits(conversation)]), fl = new Set([...links(facts), ...links(conversation)]);
   for (const d of digits(reply)) if (![...fd].some((f) => f.includes(d) || d.includes(f))) return { ok: false, reason: "number not in square: " + d };
   for (const l of links(reply)) if (![...fl].some((f) => f.includes(l.split("/")[0]))) return { ok: false, reason: "link not in square: " + l };
   if (/\[src:|\bVERIFIED\b|\bUNVERIFIED\b|\bCHECK\b/.test(reply)) return { ok: false, reason: "leaked tag" };
+  if (TEAM_LABEL_ANYWHERE.test(reply)) return { ok: false, reason: "team label" };
   if (reply.length > Math.max(900, facts.length * 2.2)) return { ok: false, reason: "too long" };
   return { ok: true };
 }

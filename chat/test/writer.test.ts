@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { codeCheck, longestSentence, longSentences, MAX_SENTENCE_WORDS } from "../lib/writer";
+import { codeCheck, longestSentence, longSentences, MAX_SENTENCE_WORDS, withoutTeamLabel } from "../lib/writer";
 
 const facts = "Call Dominion at 866-366-4357 or sign in at dominionenergy.com. For 4 people the limit is $4,018/mo. Apply at commonhelp.virginia.gov.";
 describe("codeCheck", () => {
@@ -25,6 +25,21 @@ describe("codeCheck", () => {
   test("rejects leaked tags and runaway length", () => {
     expect(codeCheck(facts, "Call 866-366-4357 [src: x.pdf]", "").reason).toBe("leaked tag");
     expect(codeCheck(facts, "Call 866-366-4357. " + "Plain words. ".repeat(120), "").reason).toBe("too long");
+  });
+});
+
+describe("team labels", () => {
+  test("rejects a reply that names a branch, in English or Spanish", () => {
+    expect(codeCheck(facts, "Branch A: call Dominion at 866-366-4357.", "").reason).toBe("team label");
+    expect(codeCheck(facts, "Rama B1: llame al 866-366-4357.", "").reason).toBe("team label");
+    expect(codeCheck(facts, "A branch office can help. Call 866-366-4357.", "").ok).toBe(true);
+  });
+  test("strips the label at the start of a square", () => {
+    expect(withoutTeamLabel("Branch B1: PIPP. Pay 10% of income.")).toBe("PIPP. Pay 10% of income.");
+    expect(withoutTeamLabel("Step 0, always first: Do you have a disconnection notice?")).toBe("Do you have a disconnection notice?");
+    expect(withoutTeamLabel("Screener, one at a time: Dominion or NOVEC?")).toBe("Dominion or NOVEC?");
+    expect(withoutTeamLabel("Urgent path. Dominion Energy 866-366-4357.")).toBe("Dominion Energy 866-366-4357.");
+    expect(withoutTeamLabel("Is household income at or under 150%?")).toBe("Is household income at or under 150%?");
   });
 });
 
